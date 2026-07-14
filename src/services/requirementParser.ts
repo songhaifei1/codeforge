@@ -183,6 +183,14 @@ function getDefaultFields(pageType: PageType, entityName: string): ParsedField[]
       { name: 'owner', label: '负责人', type: 'text' },
     ]
   }
+  if (pageType === 'dashboard') {
+    return [
+      { name: 'name', label: '设备名称', type: 'text' },
+      { name: 'status', label: '状态', type: 'tag', options: ['运行中', '故障', '维护中'] },
+      { name: 'count', label: '报警次数', type: 'number' },
+      { name: 'createTime', label: '统计时间', type: 'date' },
+    ]
+  }
   return [
     { name: 'id', label: '编号', type: 'text' },
     { name: 'name', label: '名称', type: 'text' },

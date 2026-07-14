@@ -2,6 +2,8 @@
 
 export type PageType = 'list' | 'form' | 'detail' | 'dashboard'
 
+export type InputMode = 'requirement' | 'api'
+
 export interface ParsedField {
   name: string
   label: string
@@ -22,6 +24,13 @@ export interface ParsedAction {
   variant: 'primary' | 'default' | 'danger' | 'success'
 }
 
+/** 详情页子区块（如体检记录、培训记录等表格） */
+export interface ParsedDetailSection {
+  name: string
+  label: string
+  columns: ParsedField[]
+}
+
 export interface ParsedRequirement {
   pageType: PageType
   entityName: string
@@ -30,6 +39,7 @@ export interface ParsedRequirement {
   filters: ParsedFilter[]
   actions: ParsedAction[]
   rawText: string
+  detailSections?: ParsedDetailSection[]
 }
 
 export interface GeneratedResult {
@@ -40,6 +50,8 @@ export interface GeneratedResult {
   entityName: string
   mockData: any[]
   parseResult: ParsedRequirement
+  apiCode?: string
+  matchedComponents?: string[]
 }
 
 export interface ChatMessage {

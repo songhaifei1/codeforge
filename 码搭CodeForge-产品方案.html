@@ -1,0 +1,1236 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>码搭 CodeForge — AI前端页面智能搭建助手 | 产品方案</title>
+<style>
+  :root {
+    --primary: #6366F1;
+    --primary-dark: #4F46E5;
+    --primary-light: #A5B4FC;
+    --primary-bg: #EEF2FF;
+    --accent: #0EA5E9;
+    --accent-bg: #E0F2FE;
+    --success: #10B981;
+    --success-bg: #D1FAE5;
+    --warning: #F59E0B;
+    --warning-bg: #FEF3C7;
+    --danger: #EF4444;
+    --danger-bg: #FEE2E2;
+    --dark: #0F172A;
+    --gray-900: #1E293B;
+    --gray-800: #334155;
+    --gray-700: #475569;
+    --gray-600: #64748B;
+    --gray-500: #94A3B8;
+    --gray-400: #CBD5E1;
+    --gray-300: #E2E8F0;
+    --gray-200: #F1F5F9;
+    --gray-100: #F8FAFC;
+    --white: #FFFFFF;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --shadow: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -2px rgba(0,0,0,0.05);
+    --shadow-lg: 0 10px 40px -5px rgba(0,0,0,0.1);
+    --shadow-card: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Helvetica Neue", sans-serif;
+    background: var(--gray-200);
+    color: var(--gray-800);
+    line-height: 1.75;
+    font-size: 15px;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* Cover */
+  .cover {
+    background: linear-gradient(160deg, #6366F1 0%, #4F46E5 20%, #7C3AED 50%, #0EA5E9 100%);
+    color: white;
+    padding: 100px 40px 80px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+  }
+  .cover::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background:
+      radial-gradient(circle at 20% 80%, rgba(14,165,233,0.15) 0%, transparent 50%),
+      radial-gradient(circle at 80% 20%, rgba(167,139,250,0.2) 0%, transparent 50%),
+      radial-gradient(circle at 50% 50%, rgba(99,102,241,0.1) 0%, transparent 70%);
+  }
+  .cover-particles {
+    position: absolute;
+    inset: 0;
+    background-image:
+      radial-gradient(2px 2px at 10% 15%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(2px 2px at 20% 45%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(2px 2px at 30% 75%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(2px 2px at 45% 25%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(2px 2px at 55% 55%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(2px 2px at 65% 80%, rgba(255,255,255,0.35), transparent),
+      radial-gradient(2px 2px at 75% 35%, rgba(255,255,255,0.4), transparent),
+      radial-gradient(2px 2px at 85% 60%, rgba(255,255,255,0.3), transparent),
+      radial-gradient(1px 1px at 15% 65%, rgba(255,255,255,0.5), transparent),
+      radial-gradient(1px 1px at 90% 10%, rgba(255,255,255,0.5), transparent);
+  }
+  .cover-content { position: relative; z-index: 2; }
+  .cover-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(255,255,255,0.18);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255,255,255,0.25);
+    padding: 8px 22px;
+    border-radius: 50px;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    margin-bottom: 28px;
+  }
+  .cover h1 { font-size: 56px; font-weight: 800; margin-bottom: 8px; letter-spacing: -2px; line-height: 1.15; }
+  .cover .subtitle { font-size: 22px; font-weight: 500; opacity: 0.92; margin-bottom: 6px; }
+  .cover .slogan { font-size: 15px; opacity: 0.7; font-style: italic; margin-bottom: 36px; }
+  .cover-meta { display: flex; justify-content: center; gap: 48px; flex-wrap: wrap; }
+  .cover-meta-item { text-align: center; }
+  .cover-meta-item .label { font-size: 11px; opacity: 0.55; text-transform: uppercase; letter-spacing: 2px; font-weight: 600; }
+  .cover-meta-item .value { font-size: 18px; font-weight: 700; margin-top: 6px; }
+
+  /* Container */
+  .container { max-width: 1040px; margin: 0 auto; padding: 0 24px; }
+
+  /* Section */
+  .section {
+    background: var(--white);
+    margin: 36px 0;
+    border-radius: var(--radius);
+    box-shadow: var(--shadow-card);
+    border: 1px solid var(--gray-300);
+    overflow: hidden;
+  }
+  .section-header {
+    padding: 28px 36px 20px;
+    border-bottom: 1px solid var(--gray-200);
+    background: var(--gray-100);
+  }
+  .section-num {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 34px; height: 34px;
+    background: linear-gradient(135deg, var(--primary), #7C3AED);
+    color: white;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 15px;
+    margin-right: 14px;
+    vertical-align: middle;
+    box-shadow: 0 2px 8px rgba(99,102,241,0.25);
+  }
+  .section-title { display: inline; font-size: 23px; font-weight: 700; color: var(--dark); vertical-align: middle; }
+  .section-desc { margin-top: 8px; margin-left: 48px; color: var(--gray-500); font-size: 14px; }
+  .section-body { padding: 28px 36px; }
+
+  /* Positioning Hero */
+  .pos-hero {
+    background: linear-gradient(135deg, var(--primary-bg) 0%, #F5F3FF 50%, var(--accent-bg) 100%);
+    border: 1px solid var(--primary-light);
+    border-radius: var(--radius);
+    padding: 36px;
+    text-align: center;
+    margin-bottom: 28px;
+  }
+  .pos-hero .tag {
+    display: inline-block;
+    background: var(--primary);
+    color: white;
+    padding: 5px 16px;
+    border-radius: 50px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+  }
+  .pos-hero h2 { font-size: 28px; color: var(--dark); font-weight: 800; margin-bottom: 12px; }
+  .pos-hero .desc { font-size: 16px; color: var(--gray-600); max-width: 680px; margin: 0 auto; line-height: 1.8; }
+  .pos-hero .desc strong { color: var(--primary-dark); }
+
+  /* VS Cursor table */
+  .vs-table { width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 13px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--gray-300); }
+  .vs-table thead th {
+    background: var(--gray-800); color: white; padding: 12px 16px; text-align: left; font-weight: 600; font-size: 13px;
+  }
+  .vs-table thead th:last-child { background: var(--primary); }
+  .vs-table tbody td { padding: 12px 16px; border-bottom: 1px solid var(--gray-200); background: var(--white); }
+  .vs-table tbody td:last-child { background: var(--primary-bg); font-weight: 600; color: var(--primary-dark); }
+  .vs-table .vs-icon { font-size: 16px; }
+  .vs-table .vs-yes { color: var(--success); font-weight: 700; }
+  .vs-table .vs-no { color: var(--danger); font-weight: 700; }
+  .vs-table .vs-partial { color: var(--warning); font-weight: 700; }
+
+  /* Pain Points Grid */
+  .pain-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin: 20px 0; }
+  .pain-card {
+    background: var(--white); border: 1px solid #FECACA; border-radius: var(--radius-sm);
+    padding: 20px; position: relative; transition: box-shadow 0.2s;
+  }
+  .pain-card:hover { box-shadow: var(--shadow); }
+  .pain-card .pain-icon { font-size: 28px; margin-bottom: 8px; }
+  .pain-card .pain-title { font-weight: 700; font-size: 15px; color: var(--gray-900); margin-bottom: 4px; }
+  .pain-card .pain-stat { font-size: 24px; font-weight: 800; color: var(--danger); line-height: 1; margin: 8px 0; }
+  .pain-card .pain-stat.sub { font-size: 18px; color: var(--warning); }
+  .pain-card .pain-desc { font-size: 12px; color: var(--gray-500); line-height: 1.7; }
+
+  /* Value Grid */
+  .value-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 20px 0; }
+  .value-card {
+    background: var(--success-bg); border: 1px solid #A7F3D0; border-radius: var(--radius-sm);
+    padding: 22px 16px; text-align: center; transition: transform 0.2s;
+  }
+  .value-card:hover { transform: translateY(-2px); }
+  .value-card .v-num { font-size: 30px; font-weight: 800; color: var(--success); line-height: 1; }
+  .value-card .v-unit { font-size: 16px; color: var(--success); font-weight: 700; }
+  .value-card .v-label { font-size: 13px; color: var(--gray-700); font-weight: 600; margin-top: 8px; }
+
+  /* Cards */
+  .card-grid { display: grid; gap: 14px; margin: 16px 0; }
+  .card-grid-2 { grid-template-columns: 1fr 1fr; }
+  .card-grid-3 { grid-template-columns: 1fr 1fr 1fr; }
+  .card-grid-4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+  .card {
+    background: var(--gray-100); border: 1px solid var(--gray-300); border-radius: var(--radius-sm);
+    padding: 20px; transition: box-shadow 0.2s, border-color 0.2s;
+  }
+  .card:hover { box-shadow: var(--shadow); border-color: var(--primary-light); }
+  .card-icon {
+    width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+    font-size: 22px; margin-bottom: 12px;
+  }
+  .card h4 { font-size: 15px; font-weight: 700; color: var(--gray-900); margin-bottom: 6px; }
+  .card p { font-size: 13px; color: var(--gray-600); line-height: 1.65; }
+
+  /* Module Cards */
+  .mod-list { display: grid; gap: 14px; margin: 20px 0; }
+  .mod-card {
+    display: flex; gap: 18px; background: var(--gray-100); border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm); padding: 20px; transition: all 0.2s;
+  }
+  .mod-card:hover { border-color: var(--primary-light); box-shadow: var(--shadow); }
+  .mod-icon {
+    width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center;
+    justify-content: center; font-size: 24px; flex-shrink: 0;
+  }
+  .mod-content { flex: 1; }
+  .mod-content h4 { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; display: flex; align-items: center; gap: 8px; }
+  .mod-tag { font-size: 10px; padding: 2px 8px; border-radius: 50px; font-weight: 700; letter-spacing: 0.5px; }
+  .mod-tag.core { background: var(--danger-bg); color: #DC2626; }
+  .mod-tag.important { background: var(--warning-bg); color: #D97706; }
+  .mod-tag.support { background: var(--accent-bg); color: #0369A1; }
+  .mod-content p { font-size: 13px; color: var(--gray-600); margin-bottom: 8px; }
+  .mod-feats { display: flex; flex-wrap: wrap; gap: 6px; }
+  .mod-feat { background: var(--white); border: 1px solid var(--gray-300); padding: 3px 10px; border-radius: 50px; font-size: 11px; color: var(--gray-700); }
+
+  /* Architecture */
+  .arch-wrap { margin: 20px 0; }
+  .arch-layer { border-radius: var(--radius-sm); margin-bottom: 6px; overflow: hidden; }
+  .arch-lh { padding: 10px 20px; font-weight: 700; font-size: 13px; color: white; display: flex; align-items: center; gap: 8px; }
+  .arch-lb { padding: 16px 20px; background: var(--gray-100); border: 1px solid var(--gray-300); border-top: none; border-radius: 0 0 var(--radius-sm) var(--radius-sm); }
+  .arch-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+  .arch-blk {
+    background: var(--white); border: 1px solid var(--gray-300); border-radius: 8px;
+    padding: 12px; text-align: center; font-size: 11px; transition: all 0.2s;
+  }
+  .arch-blk:hover { border-color: var(--primary); transform: translateY(-2px); box-shadow: var(--shadow); }
+  .arch-blk .bi { font-size: 20px; margin-bottom: 4px; }
+  .arch-blk .bn { font-weight: 700; color: var(--gray-900); margin-bottom: 2px; font-size: 12px; }
+  .arch-blk .bd { color: var(--gray-500); font-size: 11px; }
+
+  /* AI Detail */
+  .ai-flow { display: flex; align-items: stretch; gap: 0; margin: 20px 0; overflow-x: auto; padding: 8px 0; }
+  .ai-node { flex: 1; min-width: 120px; background: var(--white); border: 2px solid var(--gray-300); border-radius: var(--radius-sm); padding: 18px 14px; text-align: center; position: relative; transition: all 0.2s; }
+  .ai-node:hover { border-color: var(--primary); box-shadow: var(--shadow); }
+  .ai-node .an-icon { font-size: 28px; margin-bottom: 8px; }
+  .ai-node .an-title { font-size: 13px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .ai-node .an-desc { font-size: 11px; color: var(--gray-500); line-height: 1.5; }
+  .ai-arrow { display: flex; align-items: center; padding: 0 6px; color: var(--primary); font-size: 22px; font-weight: 700; }
+
+  /* Flow */
+  .flow-row { display: flex; align-items: stretch; gap: 0; margin: 20px 0; overflow-x: auto; }
+  .flow-step { flex: 1; min-width: 130px; background: var(--white); border: 2px solid var(--gray-300); border-radius: var(--radius-sm); padding: 18px 12px; text-align: center; position: relative; }
+  .flow-step:hover { border-color: var(--primary); }
+  .flow-step .fs-num { position: absolute; top: -12px; left: 50%; transform: translateX(-50%); background: var(--primary); color: white; width: 24px; height: 24px; border-radius: 50%; font-size: 11px; line-height: 24px; font-weight: 700; }
+  .flow-step .fs-icon { font-size: 28px; margin: 8px 0; }
+  .flow-step h5 { font-size: 13px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .flow-step p { font-size: 11px; color: var(--gray-500); }
+  .flow-arr { display: flex; align-items: center; padding: 0 4px; color: var(--gray-400); font-size: 18px; }
+
+  /* Demo Script */
+  .demo-step { display: flex; gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--gray-200); align-items: flex-start; }
+  .demo-step:last-child { border-bottom: none; }
+  .ds-num {
+    width: 38px; height: 38px; border-radius: 10px; background: var(--primary-bg); color: var(--primary);
+    display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 15px; flex-shrink: 0;
+  }
+  .ds-content h5 { font-size: 15px; font-weight: 700; color: var(--gray-900); margin-bottom: 4px; }
+  .ds-content .ds-time { font-size: 11px; color: var(--gray-500); margin-bottom: 6px; font-style: italic; }
+  .ds-content p { font-size: 13px; color: var(--gray-600); margin-bottom: 6px; line-height: 1.7; }
+  .ds-content .ds-tag { display: inline-block; background: var(--warning-bg); color: #92400E; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 700; }
+
+  /* Table */
+  .data-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  .data-table th { background: var(--gray-800); color: white; padding: 12px 16px; text-align: left; font-weight: 600; }
+  .data-table th:first-child { border-radius: 8px 0 0 0; }
+  .data-table th:last-child { border-radius: 0 8px 0 0; }
+  .data-table td { padding: 11px 16px; border-bottom: 1px solid var(--gray-200); }
+  .data-table tr:hover td { background: var(--gray-100); }
+  .tag { display: inline-block; padding: 3px 10px; border-radius: 50px; font-size: 11px; font-weight: 700; }
+  .tag-red { background: var(--danger-bg); color: #DC2626; }
+  .tag-green { background: var(--success-bg); color: #166534; }
+  .tag-yellow { background: var(--warning-bg); color: #92400E; }
+  .tag-blue { background: var(--accent-bg); color: #0369A1; }
+  .tag-purple { background: var(--primary-bg); color: #4338CA; }
+
+  /* Phase roadmap */
+  .phase-row { display: flex; gap: 0; margin-bottom: 14px; align-items: flex-start; }
+  .phase-timeline { width: 50px; flex-shrink: 0; display: flex; flex-direction: column; align-items: center; }
+  .phase-dot { width: 14px; height: 14px; border-radius: 50%; border: 3px solid; background: white; position: relative; z-index: 1; }
+  .phase-line { width: 2px; flex: 1; background: var(--gray-300); min-height: 40px; }
+  .phase-body { flex: 1; padding-bottom: 20px; padding-left: 12px; }
+  .phase-body h4 { font-size: 16px; font-weight: 700; display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+  .phase-body .pt { font-size: 12px; color: var(--gray-500); margin-bottom: 8px; }
+  .phase-body ul { list-style: none; padding-left: 0; }
+  .phase-body ul li { font-size: 13px; color: var(--gray-700); padding: 3px 0 3px 20px; position: relative; }
+  .phase-body ul li::before { content: '▸'; position: absolute; left: 4px; color: var(--primary); font-weight: 700; font-size: 10px; top: 5px; }
+
+  /* Highlight box */
+  .hl-box { background: #FFFBEB; border-left: 4px solid var(--warning); padding: 16px 20px; border-radius: 0 8px 8px 0; margin: 16px 0; font-size: 13px; color: var(--gray-700); }
+  .hl-box strong { color: var(--gray-900); }
+  .hl-box.blue { background: var(--primary-bg); border-left-color: var(--primary); }
+  .hl-box.green { background: var(--success-bg); border-left-color: var(--success); }
+  .hl-box.red { background: var(--danger-bg); border-left-color: var(--danger); }
+
+  /* Footer */
+  .footer { text-align: center; padding: 48px 24px; color: var(--gray-500); font-size: 13px; }
+  .footer .fl { font-size: 20px; font-weight: 800; color: var(--primary); margin-bottom: 8px; }
+
+  .metrics-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 20px 0; }
+  .metric-card {
+    background: linear-gradient(135deg, var(--primary-bg) 0%, #F5F3FF 100%);
+    border-radius: var(--radius-sm); padding: 24px 16px; text-align: center; border: 1px solid var(--primary-light);
+  }
+  .metric-card .mv { font-size: 34px; font-weight: 800; color: var(--primary); line-height: 1; }
+  .metric-card .mu { font-size: 16px; color: var(--primary); }
+  .metric-card .ml { font-size: 13px; color: var(--gray-600); margin-top: 8px; font-weight: 600; }
+
+  @media (max-width: 768px) {
+    .card-grid-2, .card-grid-3, .card-grid-4, .pain-grid, .value-grid, .arch-row, .metrics-grid { grid-template-columns: 1fr; }
+    .flow-row, .ai-flow { flex-direction: column; }
+    .flow-arr, .ai-arrow { transform: rotate(90deg); justify-content: center; }
+    .cover h1 { font-size: 36px; }
+    .section-body { padding: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ===== COVER ===== -->
+<div class="cover">
+  <div class="cover-particles"></div>
+  <div class="cover-content">
+    <div class="cover-badge">⚡ 黑客松参赛方案 · 内部提效赛道</div>
+    <h1>码搭 CodeForge</h1>
+    <div class="subtitle">AI 前端页面智能搭建助手</div>
+    <div class="slogan">"说句话，页面就有了"</div>
+    <div class="cover-meta">
+      <div class="cover-meta-item"><div class="label">产品定位</div><div class="value">AI 页面工厂</div></div>
+      <div class="cover-meta-item"><div class="label">技术栈</div><div class="value">LLM + RAG + Agent</div></div>
+      <div class="cover-meta-item"><div class="label">交付周期</div><div class="value">1 天黑客松</div></div>
+      <div class="cover-meta-item"><div class="label">目标用户</div><div class="value">前端开发工程师</div></div>
+    </div>
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ===== 1. 产品定位 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">1</span>
+    <span class="section-title">产品定位</span>
+    <div class="section-desc">明确产品是什么、不是什么，以及与通用AI编程工具的本质区别</div>
+  </div>
+  <div class="section-body">
+
+    <div class="pos-hero">
+      <div class="tag">一句话定位</div>
+      <h2>企业级 AI 前端页面工厂：理解业务需求，复用企业组件，自动生成可运行页面</h2>
+      <div class="desc">
+        码搭不是又一个代码补全工具。它是一个<strong>懂公司组件库、懂业务规范、懂页面模式的 AI 工程师</strong>。
+        输入需求/原型/接口文档，直接输出基于公司技术栈的<strong>可运行前端页面</strong>——不是代码片段，不是骨架，是完整的、符合规范的、可以跑起来的页面。
+      </div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:24px 0 12px;">🎯 产品边界：码搭 vs 通用 AI 编程工具</h3>
+    <table class="vs-table">
+      <thead>
+        <tr><th>能力维度</th><th>Cursor / Copilot</th><th>ChatGPT / Claude</th><th style="background:var(--primary);">码搭 CodeForge</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>代码粒度</td><td>行级 / 函数级</td><td>行级 / 函数级</td><td>页面级 / 模块级</td></tr>
+        <tr><td>企业组件库认知</td><td class="vs-no">✗ 需手动导入</td><td class="vs-no">✗ 不知道</td><td class="vs-yes">✓ 内置组件知识库</td></tr>
+        <tr><td>编码规范对齐</td><td class="vs-partial">△ 部分支持</td><td class="vs-no">✗ 不知道</td><td class="vs-yes">✓ 自动遵循企业规范</td></tr>
+        <tr><td>接口文档理解</td><td class="vs-partial">△ 需手动粘贴</td><td class="vs-partial">△ 需手动粘贴</td><td class="vs-yes">✓ 直接解析 Swagger/YAPI</td></tr>
+        <tr><td>原型图/截图输入</td><td class="vs-partial">△ 有限</td><td class="vs-no">✗</td><td class="vs-yes">✓ Figma/截图→代码</td></tr>
+        <tr><td>Mock数据生成</td><td class="vs-no">✗</td><td class="vs-partial">△ 需手动描述</td><td class="vs-yes">✓ 自动生成Mock服务</td></tr>
+        <tr><td>持续对话修改</td><td class="vs-yes">✓</td><td class="vs-yes">✓</td><td class="vs-yes">✓ 页面级上下文记忆</td></tr>
+        <tr><td>多页面模式库</td><td class="vs-no">✗</td><td class="vs-no">✗</td><td class="vs-yes">✓ 列表/表单/详情等</td></tr>
+        <tr><td>页面质量评估</td><td class="vs-no">✗</td><td class="vs-no">✗</td><td class="vs-yes">✓ 规范检查+走查报告</td></tr>
+        <tr><td>企业部署</td><td class="vs-partial">△ SaaS</td><td class="vs-partial">△ SaaS</td><td class="vs-yes">✓ 可私有化部署</td></tr>
+      </tbody>
+    </table>
+
+    <div class="hl-box blue">
+      <strong>核心差异总结：</strong>Cursor/Copilot 帮你「写一行代码」，码搭帮你「搭一个页面」。从代码级助手升级为页面级工厂，从通用能力升级为企业定制能力。本质是从「人写代码、AI辅助」跃迁为「AI写页面、人做决策」。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 2. 用户痛点分析 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">2</span>
+    <span class="section-title">用户痛点分析</span>
+    <div class="section-desc">量化前端开发中高频重复劳动的时间与心理成本</div>
+  </div>
+  <div class="section-body">
+
+    <div class="pain-grid">
+      <div class="pain-card">
+        <div class="pain-icon">🔁</div>
+        <div class="pain-title">页面重复搭建</div>
+        <div class="pain-stat">60%<span style="font-size:14px;font-weight:600;"> 相似页面</span></div>
+        <div class="pain-desc">后台管理系统中，列表页、表单页、详情页高度相似，每个新页面却要从头写起，大量 copy-paste-adapt。</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">🔍</div>
+        <div class="pain-title">组件查找困难</div>
+        <div class="pain-stat" style="color:var(--warning);">15min<span style="font-size:14px;font-weight:600;"> /次</span></div>
+        <div class="pain-desc">公司组件库有200+组件，但不知道用哪个、怎么用、有没有现成的页面模板可以参考。</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">🔌</div>
+        <div class="pain-title">接口对接繁琐</div>
+        <div class="pain-stat" style="color:var(--warning);">40%<span style="font-size:14px;font-weight:600;"> 开发时间</span></div>
+        <div class="pain-desc">每个页面30%-50%时间花在接口对接、TS类型定义、Mock数据准备上，纯手工活。</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">📋</div>
+        <div class="pain-title">需求翻译成本高</div>
+        <div class="pain-stat" style="color:var(--warning);">30min<span style="font-size:14px;font-weight:600;"> 理解+设计</span></div>
+        <div class="pain-desc">从PRD文档到页面结构设计，前端需要在脑子里翻译一遍，耗时且容易遗漏需求点。</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">🎨</div>
+        <div class="pain-title">设计还原偏差</div>
+        <div class="pain-stat" style="color:var(--warning);">3轮<span style="font-size:14px;font-weight:600;"> 平均返工</span></div>
+        <div class="pain-desc">对照设计稿手写页面，间距、字号、颜色总有偏差，设计走查至少来回3轮修改。</div>
+      </div>
+      <div class="pain-card">
+        <div class="pain-icon">🐣</div>
+        <div class="pain-title">新人上手慢</div>
+        <div class="pain-stat" style="color:var(--warning);">2周<span style="font-size:14px;font-weight:600;"> 写第一个页面</span></div>
+        <div class="pain-desc">新人需熟悉组件库、项目结构、编码规范、接口规范，前两周基本都在学习和试错。</div>
+      </div>
+    </div>
+
+    <div class="hl-box red">
+      <strong>根本矛盾：</strong>前端开发中60%以上的页面是重复模式（列表/表单/详情/弹窗），但当前开发模式是「每次从零搭建」。AI编程助手只解决了「怎么写」，没解决「不知道写什么组件」和「组件怎么用」的问题。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 3. 产品核心价值 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">3</span>
+    <span class="section-title">产品核心价值</span>
+    <div class="section-desc">量化提效数据与多维度价值矩阵</div>
+  </div>
+  <div class="section-body">
+
+    <div class="value-grid">
+      <div class="value-card"><div class="v-num">70<span class="v-unit">%</span></div><div class="v-label">页面搭建时间节省</div></div>
+      <div class="value-card"><div class="v-num">3x<span class="v-unit"></span></div><div class="v-label">组件复用率提升</div></div>
+      <div class="value-card"><div class="v-num">85<span class="v-unit">%</span></div><div class="v-label">规范一致性提升</div></div>
+      <div class="value-card"><div class="v-num">1天<span class="v-unit"></span></div><div class="v-label">新人产出速度</div></div>
+    </div>
+
+    <div class="card-grid card-grid-3" style="margin-top:20px;">
+      <div class="card">
+        <div class="card-icon" style="background:#DBEAFE;color:#2563EB;">⚡</div>
+        <h4>效率价值</h4>
+        <p>标准列表页从4小时→1小时；接口对接从1.5小时→15分钟；Mock数据从30分钟→自动生成。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:#D1FAE5;color:#065F46;">📐</div>
+        <h4>质量价值</h4>
+        <p>生成的代码100%使用公司组件，天然符合编码规范，设计还原度从70%提升至90%+。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:#FEF3C7;color:#92400E;">🧠</div>
+        <h4>知识价值</h4>
+        <p>隐性知识显性化：组件使用模式、业务模板、编码最佳实践从人的脑子里变为AI可理解的知识库。</p>
+      </div>
+    </div>
+
+    <div class="hl-box green">
+      <strong>ROI 快速估算：</strong>一个10人前端团队，每天约搭建4个新页面。按每个页面节省3小时计算，每日节省12人时，折合约1.5个全职工程师的产出。年化节省约 ¥50万+ 人力成本。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 4. 产品功能模块设计 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">4</span>
+    <span class="section-title">功能模块设计</span>
+    <div class="section-desc">七大功能模块，三类优先级，全链路覆盖</div>
+  </div>
+  <div class="section-body">
+
+    <div class="mod-list">
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#DBEAFE;color:#2563EB;">💬</div>
+        <div class="mod-content">
+          <h4>需求转页面引擎 <span class="mod-tag core">MVP核心</span></h4>
+          <p>自然语言需求输入 → AI解析意图 → 选择页面模式 → 生成完整页面代码。支持中文口语化描述。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">语义意图理解</span><span class="mod-feat">页面模式匹配</span><span class="mod-feat">组件调度</span><span class="mod-feat">代码生成管线</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#E0E7FF;color:#4338CA;">🎨</div>
+        <div class="mod-content">
+          <h4>视觉输入解析 <span class="mod-tag important">重要</span></h4>
+          <p>上传原型图 / Figma设计稿 / 页面截图 → 视觉理解模型识别布局和组件 → 生成代码。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">多模态识别</span><span class="mod-feat">布局分析</span><span class="mod-feat">组件映射</span><span class="mod-feat">样式提取</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#D1FAE5;color:#065F46;">📡</div>
+        <div class="mod-content">
+          <h4>接口文档解析 <span class="mod-tag important">重要</span></h4>
+          <p>输入Swagger/YAPI URL或JSON结构 → 自动生成API调用代码、TypeScript类型、Mock数据、表单校验规则。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">Swagger解析</span><span class="mod-feat">TS类型生成</span><span class="mod-feat">Mock服务</span><span class="mod-feat">参数校验</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#FEF3C7;color:#92400E;">📦</div>
+        <div class="mod-content">
+          <h4>企业组件知识库 <span class="mod-tag core">MVP核心</span></h4>
+          <p>构建公司组件库的RAG知识库：组件文档、使用示例、Props说明、最佳实践。保证生成代码100%使用企业组件。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">组件文档向量化</span><span class="mod-feat">语义检索</span><span class="mod-feat">示例代码库</span><span class="mod-feat">规范知识库</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#FCE7F3;color:#BE185D;">✏️</div>
+        <div class="mod-content">
+          <h4>对话式页面修改 <span class="mod-tag core">MVP核心</span></h4>
+          <p>生成页面后，通过自然语言持续修改：「增加导出按钮」「把表格改成卡片」「加权限控制」。AI理解上下文并精准修改。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">上下文记忆</span><span class="mod-feat">精准定位修改</span><span class="mod-feat">增量代码生成</span><span class="mod-feat">冲突检测</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#E0F2FE;color:#0369A1;">🔍</div>
+        <div class="mod-content">
+          <h4>代码质量评估 <span class="mod-tag support">增值</span></h4>
+          <p>自动检查生成的页面代码：组件使用是否正确、规范是否合规、可访问性、性能最佳实践。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">ESLint集成</span><span class="mod-feat">规范检查</span><span class="mod-feat">a11y检查</span><span class="mod-feat">性能建议</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="mod-card">
+        <div class="mod-icon" style="background:#F3E8FF;color:#7C3AED;">📚</div>
+        <div class="mod-content">
+          <h4>页面模板市场 <span class="mod-tag support">增值</span></h4>
+          <p>沉淀团队历史页面为模板，新项目直接复用。支持搜索、预览、一键使用。形成组织级页面资产。</p>
+          <div class="mod-feats">
+            <span class="mod-feat">模板沉淀</span><span class="mod-feat">语义搜索</span><span class="mod-feat">预览导出</span><span class="mod-feat">版本管理</span>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 5. MVP 版本规划 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">5</span>
+    <span class="section-title">MVP 版本规划</span>
+    <div class="section-desc">黑客松 1 天可交付的范围 + 后续迭代路线</div>
+  </div>
+  <div class="section-body">
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:16px;">⚡ 黑客松 MVP：一天交付清单</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>功能模块</th><th>MVP 交付范围</th><th>优先级</th><th>预计工作量</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>需求转页面</strong></td><td>支持3种页面模式——列表页、表单页、详情页，输入自然语言生成完整页面</td><td><span class="tag tag-red">P0 必须</span></td><td>4小时</td></tr>
+        <tr><td><strong>组件知识库</strong></td><td>选取10-15个高频组件（Table、Form、Modal、Select等），构建RAG知识库</td><td><span class="tag tag-red">P0 必须</span></td><td>2小时</td></tr>
+        <tr><td><strong>对话式修改</strong></td><td>支持3-5种常见修改指令：「加导出」「加搜索」「改排序」「加分页」</td><td><span class="tag tag-red">P0 必须</span></td><td>1.5小时</td></tr>
+        <tr><td><strong>接口文档解析</strong></td><td>支持JSON格式接口定义，生成TypeScript类型和Mock数据</td><td><span class="tag tag-yellow">P1 重要</span></td><td>1.5小时</td></tr>
+        <tr><td><strong>Web工作台UI</strong></td><td>简洁的对话式交互界面 + 代码预览面板</td><td><span class="tag tag-red">P0 必须</span></td><td>1小时</td></tr>
+        <tr><td><strong>Demo场景准备</strong></td><td>准备3套演示用例（设备管理列表、工单录入表单、数据详情页）</td><td><span class="tag tag-red">P0 必须</span></td><td>1小时</td></tr>
+      </tbody>
+    </table>
+
+    <div class="hl-box blue">
+      <strong>MVP验收标准：</strong>输入一段中文需求描述，系统能在30秒内输出一个基于企业组件库的、可运行的前端页面代码，包含表格/表单/基础交互。员工可直接复制到项目中使用，至少能跑通列表页的增删改查。
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">🗺️ 三阶段迭代路线</h3>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--primary);"></div><div class="phase-line"></div></div>
+      <div class="phase-body">
+        <h4>Phase 1 · 黑客松 MVP <span class="tag tag-red">1天</span></h4>
+        <div class="pt">验证「需求→页面」核心价值闭环</div>
+        <ul>
+          <li>自然语言需求解析 + 3种页面模式生成</li>
+          <li>15个高频组件RAG知识库</li>
+          <li>对话式修改（5种指令）</li>
+          <li>JSON接口文档→TS类型+Mock</li>
+          <li>Web对话工作台 + 代码预览</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--accent);"></div><div class="phase-line"></div></div>
+      <div class="phase-body">
+        <h4>Phase 2 · 能力增强 <span class="tag tag-yellow">黑客松后4周</span></h4>
+        <div class="pt">扩展输入方式，提升生成质量</div>
+        <ul>
+          <li>Figma/原型图截图识别</li>
+          <li>Swagger在线文档解析</li>
+          <li>全量组件库知识库覆盖</li>
+          <li>页面模式扩展至7种（统计页、工单页、设备管理等）</li>
+          <li>代码质量自动检查与修复建议</li>
+          <li>页面历史版本对比</li>
+          <li>前端团队试点（10人）收集反馈</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--warning);"></div></div>
+      <div class="phase-body">
+        <h4>Phase 3 · 平台化 <span class="tag tag-blue">黑客松后12周</span></h4>
+        <div class="pt">从工具升级为组织级前端效能平台</div>
+        <ul>
+          <li>页面模板市场 + 团队模板沉淀与共享</li>
+          <li>项目级代码生成（多页面、路由、权限、布局一次性生成）</li>
+          <li>深度集成CI/CD，生成代码直接创建MR</li>
+          <li>组件使用分析与推荐引擎</li>
+          <li>全公司推广，接入多个项目团队</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 6. 技术架构设计 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">6</span>
+    <span class="section-title">技术架构设计</span>
+    <div class="section-desc">五层分层架构，模块解耦，支持灵活扩展</div>
+  </div>
+  <div class="section-body">
+
+    <div class="arch-wrap">
+
+      <div class="arch-layer">
+        <div class="arch-lh" style="background:var(--primary);">🖥️ 展示层 · Presentation</div>
+        <div class="arch-lb">
+          <div class="arch-row">
+            <div class="arch-blk"><div class="bi">💬</div><div class="bn">对话工作台</div><div class="bd">Web SPA (React)</div></div>
+            <div class="arch-blk"><div class="bi">📝</div><div class="bn">代码预览面板</div><div class="bd">Monaco Editor</div></div>
+            <div class="arch-blk"><div class="bi">📱</div><div class="bn">移动端入口</div><div class="bd">H5 轻量接入</div></div>
+            <div class="arch-blk"><div class="bi">🔌</div><div class="bn">IDE 插件</div><div class="bd">VS Code Extension</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--gray-400);font-size:18px;margin:2px 0;">↓</div>
+
+      <div class="arch-layer">
+        <div class="arch-lh" style="background:var(--accent);">⚙️ 应用服务层 · Application</div>
+        <div class="arch-lb">
+          <div class="arch-row">
+            <div class="arch-blk"><div class="bi">📄</div><div class="bn">页面生成服务</div><div class="bd">编排生成管线</div></div>
+            <div class="arch-blk"><div class="bi">🔄</div><div class="bn">对话管理服务</div><div class="bd">上下文/会话管理</div></div>
+            <div class="arch-blk"><div class="bi">📊</div><div class="bn">模板管理服务</div><div class="bd">页面模板CRUD</div></div>
+            <div class="arch-blk"><div class="bi">🔐</div><div class="bn">项目接入服务</div><div class="bd">配置/权限/集成</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--gray-400);font-size:18px;margin:2px 0;">↓</div>
+
+      <div class="arch-layer">
+        <div class="arch-lh" style="background:#7C3AED;">🧠 AI 引擎层 · AI Engine</div>
+        <div class="arch-lb">
+          <div class="arch-row">
+            <div class="arch-blk"><div class="bi">🤖</div><div class="bn">LLM 推理引擎</div><div class="bd">混元/GPT-4o/Claude</div></div>
+            <div class="arch-blk"><div class="bi">📚</div><div class="bn">RAG 知识库</div><div class="bd">组件+规范+模板</div></div>
+            <div class="arch-blk"><div class="bi">🎯</div><div class="bn">Agent 编排器</div><div class="bd">多步骤生成调度</div></div>
+            <div class="arch-blk"><div class="bi">👁️</div><div class="bn">多模态理解</div><div class="bd">视觉→布局识别</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--gray-400);font-size:18px;margin:2px 0;">↓</div>
+
+      <div class="arch-layer">
+        <div class="arch-lh" style="background:var(--success);">🔧 数据处理层 · Data Processing</div>
+        <div class="arch-lb">
+          <div class="arch-row">
+            <div class="arch-blk"><div class="bi">🔍</div><div class="bn">意图解析器</div><div class="bd">需求→页面类型</div></div>
+            <div class="arch-blk"><div class="bi">📐</div><div class="bn">结构设计器</div><div class="bd">页面骨架生成</div></div>
+            <div class="arch-blk"><div class="bi">🧩</div><div class="bn">组件调度器</div><div class="bd">匹配+参数填充</div></div>
+            <div class="arch-blk"><div class="bi">💾</div><div class="bn">向量数据库</div><div class="bd">ChromaDB/Milvus</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div style="text-align:center;color:var(--gray-400);font-size:18px;margin:2px 0;">↓</div>
+
+      <div class="arch-layer">
+        <div class="arch-lh" style="background:var(--warning);">📡 输入接入层 · Input Gateway</div>
+        <div class="arch-lb">
+          <div class="arch-row">
+            <div class="arch-blk"><div class="bi">💬</div><div class="bn">自然语言</div><div class="bd">需求文本/对话</div></div>
+            <div class="arch-blk"><div class="bi">🖼️</div><div class="bn">视觉输入</div><div class="bd">Figma/原型图/截图</div></div>
+            <div class="arch-blk"><div class="bi">📡</div><div class="bn">接口文档</div><div class="bd">Swagger/YAPI/JSON</div></div>
+            <div class="arch-blk"><div class="bi">📦</div><div class="bn">模板引用</div><div class="bd">已有页面/模板</div></div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 12px;">🔑 关键技术选型</h3>
+    <div class="card-grid card-grid-2">
+      <div class="card">
+        <h4 style="color:var(--primary);margin-bottom:10px;">🧠 AI 层选型</h4>
+        <p style="font-size:13px;line-height:2.1;">
+          <strong>LLM：</strong>混元大模型 / GPT-4o / Claude 3.5（支持多模态）<br>
+          <strong>Embedding：</strong>text-embedding-3-large / bge-large-zh<br>
+          <strong>向量数据库：</strong>ChromaDB（MVP）/ Milvus（生产）<br>
+          <strong>Agent框架：</strong>LangGraph / 自研编排器<br>
+          <strong>Prompt管理：</strong>LangSmith / 自建Prompt模板库
+        </p>
+      </div>
+      <div class="card">
+        <h4 style="color:var(--accent);margin-bottom:10px;">🏗️ 工程层选型</h4>
+        <p style="font-size:13px;line-height:2.1;">
+          <strong>后端：</strong>Python FastAPI + Go（高性能解析）<br>
+          <strong>前端：</strong>React 18 + TypeScript + Monaco Editor<br>
+          <strong>存储：</strong>PostgreSQL + MinIO（代码文件）<br>
+          <strong>缓存：</strong>Redis<br>
+          <strong>部署：</strong>Docker Compose（MVP）/ K8s（生产）<br>
+          <strong>代码沙箱：</strong>Docker容器隔离执行
+        </p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 7. AI 实现方案 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">7</span>
+    <span class="section-title">AI 实现方案</span>
+    <div class="section-desc">LLM + RAG + Agent 三位一体的核心技术设计</div>
+  </div>
+  <div class="section-body">
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:16px;">🔄 AI 处理管线</h3>
+    <div class="ai-flow">
+      <div class="ai-node"><div class="an-icon">📝</div><div class="an-title">意图解析</div><div class="an-desc">从需求文本识别页面类型、字段、交互</div></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node"><div class="an-icon">🔍</div><div class="an-title">组件检索</div><div class="an-desc">RAG搜索匹配企业组件库</div></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node"><div class="an-icon">📐</div><div class="an-title">结构设计</div><div class="an-desc">生成页面组件树和数据流</div></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node"><div class="an-icon">⚙️</div><div class="an-title">代码生成</div><div class="an-desc">注入组件知识+规范，生成代码</div></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node"><div class="an-icon">✅</div><div class="an-title">质量校验</div><div class="an-desc">规范检查+完整性校验</div></div>
+      <div class="ai-arrow">→</div>
+      <div class="ai-node"><div class="an-icon">📦</div><div class="an-title">交付输出</div><div class="an-desc">完整页面代码+类型+Mock</div></div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">📚 RAG 知识库设计</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>知识库</th><th>内容</th><th>向量化方式</th><th>更新频率</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>组件文档库</strong></td><td>组件API文档、Props说明、使用示例、Demo代码</td><td>分块嵌入，按组件+属性+场景多维度</td><td>组件库发版时更新</td></tr>
+        <tr><td><strong>编码规范库</strong></td><td>ESLint规则、命名规范、目录结构、代码风格</td><td>规则条目级嵌入</td><td>规范更新时</td></tr>
+        <tr><td><strong>页面模板库</strong></td><td>历史优秀页面、业务模板、常用页面模式</td><td>页面级+组件级双粒度</td><td>新模板上线时</td></tr>
+        <tr><td><strong>项目上下文库</strong></td><td>当前项目技术栈、依赖、路由、已有页面</td><td>项目级嵌入</td><td>项目配置变更时</td></tr>
+      </tbody>
+    </table>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">🤖 Agent 编排方案</h3>
+    <div class="card-grid card-grid-3">
+      <div class="card" style="border-left:3px solid var(--primary);">
+        <div class="card-icon" style="background:var(--primary-bg);color:var(--primary);">🎯</div>
+        <h4>Intent Agent · 意图解析</h4>
+        <p>接收用户输入，识别页面类型（列表/表单/详情/混合），提取字段需求和交互需求，输出结构化的页面描述JSON。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--accent);">
+        <div class="card-icon" style="background:var(--accent-bg);color:var(--accent);">🔍</div>
+        <h4>Retrieval Agent · 组件检索</h4>
+        <p>基于页面描述，在RAG知识库中检索最匹配的企业组件，输出组件清单+使用方式+Props配置。</p>
+      </div>
+      <div class="card" style="border-left:3px solid var(--success);">
+        <div class="card-icon" style="background:var(--success-bg);color:var(--success);">⚡</div>
+        <h4>CodeGen Agent · 代码生成</h4>
+        <p>融合页面描述、组件清单、编码规范，生成完整的Vue/React页面代码。含模板、逻辑、样式、类型定义。</p>
+      </div>
+    </div>
+
+    <div class="hl-box blue">
+      <strong>Prompt 工程核心策略：</strong>不直接让LLM输出代码，而是采用「意图解析 → 结构设计 → 组件匹配 → 代码生成」的分步策略。每一步都有明确的输入输出约束，大幅提升生成质量。结构设计阶段使用Few-shot示例注入组件使用模式，代码生成阶段严格约束只使用企业组件。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 8. 用户使用流程 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">8</span>
+    <span class="section-title">用户使用流程</span>
+    <div class="section-desc">从前端开发人员的视角，展示完整使用旅程</div>
+  </div>
+  <div class="section-body">
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:16px;">👨‍💻 场景一：需求驱动创建页面（最常用）</h3>
+    <div class="flow-row">
+      <div class="flow-step">
+        <div class="fs-num">1</div>
+        <div class="fs-icon">💬</div>
+        <h5>输入需求</h5>
+        <p>自然语言描述页面需求</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">2</div>
+        <div class="fs-icon">🧠</div>
+        <h5>AI解析</h5>
+        <p>识别页面类型与字段</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">3</div>
+        <div class="fs-icon">📐</div>
+        <h5>预览确认</h5>
+        <p>查看页面结构预览</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">4</div>
+        <div class="fs-icon">⚡</div>
+        <h5>生成代码</h5>
+        <p>自动生成完整页面代码</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">5</div>
+        <div class="fs-icon">✏️</div>
+        <h5>对话修改</h5>
+        <p>自然语言持续调整</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">6</div>
+        <div class="fs-icon">📋</div>
+        <h5>复制使用</h5>
+        <p>代码复制到项目/创建MR</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">🎨 场景二：原型图/设计稿驱动</h3>
+    <div class="flow-row">
+      <div class="flow-step">
+        <div class="fs-num">1</div>
+        <div class="fs-icon">🖼️</div>
+        <h5>上传图片</h5>
+        <p>拖拽原型图/Figma截图</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">2</div>
+        <div class="fs-icon">👁️</div>
+        <h5>视觉识别</h5>
+        <p>识别布局与UI组件</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">3</div>
+        <div class="fs-icon">🧩</div>
+        <h5>组件映射</h5>
+        <p>匹配企业组件库</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">4</div>
+        <div class="fs-icon">⚡</div>
+        <h5>生成代码</h5>
+        <p>输出前端页面代码</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">5</div>
+        <div class="fs-icon">📋</div>
+        <h5>复制使用</h5>
+        <p>复制到项目使用</p>
+      </div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">📡 场景三：接口文档驱动</h3>
+    <div class="flow-row">
+      <div class="flow-step">
+        <div class="fs-num">1</div>
+        <div class="fs-icon">📡</div>
+        <h5>输入API</h5>
+        <p>粘贴Swagger/JSON</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">2</div>
+        <div class="fs-icon">🔍</div>
+        <h5>解析结构</h5>
+        <p>提取字段和接口</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">3</div>
+        <div class="fs-icon">📐</div>
+        <h5>生成页面</h5>
+        <p>自动选择页面模式</p>
+      </div>
+      <div class="flow-arr">→</div>
+      <div class="flow-step">
+        <div class="fs-num">4</div>
+        <div class="fs-icon">📦</div>
+        <h5>一次性输出</h5>
+        <p>页面+API+类型+Mock</p>
+      </div>
+    </div>
+
+    <div class="hl-box blue">
+      <strong>设计原则：</strong>三种输入方式共享同一套AI管线，根据输入类型自动路由到不同的「意图解析Agent」。无论用哪种方式开始，用户最终都在对话工作台中对生成的页面进行审核和修改。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 9. Demo 演示流程 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">9</span>
+    <span class="section-title">Demo 演示流程</span>
+    <div class="section-desc">黑客松现场 8 分钟路演脚本，确保评委记住核心价值</div>
+  </div>
+  <div class="section-body">
+
+    <div style="background:linear-gradient(135deg, #1E293B 0%, #334155 100%);color:white;border-radius:var(--radius);padding:28px;margin:0 0 24px;">
+      <h4 style="font-size:18px;margin-bottom:16px;display:flex;align-items:center;gap:8px;">🎬 Demo 设定：设备管理系统开发场景</h4>
+      <p style="opacity:0.85;font-size:14px;margin-bottom:6px;">某智能制造项目需要开发一套设备监控后台，需求方刚刚提了4个页面需求。传统方式需要前端花2天开发。现在用码搭，现场演示<strong style="color:#67E8F9;">2分钟生成4个页面</strong>。</p>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-top:16px;">
+        <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px;text-align:center;font-size:12px;">📋<br>设备列表+筛选</div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px;text-align:center;font-size:12px;">🔧<br>设备详情页</div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px;text-align:center;font-size:12px;">⚠️<br>报警管理页</div>
+        <div style="background:rgba(255,255,255,0.1);border-radius:8px;padding:12px;text-align:center;font-size:12px;">📊<br>数据统计页</div>
+      </div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:16px;">📝 演示脚本（8分钟）</h3>
+
+    <div class="demo-step">
+      <div class="ds-num">1</div>
+      <div class="ds-content">
+        <h5>开场：痛点引入</h5>
+        <div class="ds-time">⏱ 30秒</div>
+        <p>"在座的各位应该都用过Cursor、Copilot，它们能帮你写一行代码。但写一个完整的管理页面，还是需要你先想清楚用什么组件、怎么布局、怎么写接口、怎么建Mock数据。我们团队每个页面平均要花4-6小时，其中60%是重复劳动。"</p>
+        <span class="ds-tag">🎯 建立共鸣：大家都有这个痛点</span>
+      </div>
+    </div>
+
+    <div class="demo-step">
+      <div class="ds-num">2</div>
+      <div class="ds-content">
+        <h5>核心演示：一句话生成设备列表页</h5>
+        <div class="ds-time">⏱ 1.5分钟</div>
+        <p><strong>操作：</strong>在对话工作台输入——"帮我创建一个设备管理列表页，需要展示设备编号、名称、类型、状态、所属车间、最后维护时间，支持按设备名称和状态筛选，点击行可以查看详情，支持分页，每页20条。"</p>
+        <p><strong>展示：</strong>30秒后，系统输出完整的Vue组件代码——Table组件、搜索栏、分页、详情跳转逻辑、Mock数据，全部基于公司组件库。</p>
+        <span class="ds-tag">✨ 视觉冲击：30秒生成一个完整的管理页面</span>
+      </div>
+    </div>
+
+    <div class="demo-step">
+      <div class="ds-num">3</div>
+      <div class="ds-content">
+        <h5>对话修改演示</h5>
+        <div class="ds-time">⏱ 1.5分钟</div>
+        <p><strong>用户说：</strong>"给表格增加一个操作列，包含编辑和删除按钮" → AI精准定位并添加</p>
+        <p><strong>用户说：</strong>"把状态字段改成标签展示，运行中显示绿色，故障显示红色" → AI修改渲染逻辑</p>
+        <p><strong>用户说：</strong>"增加批量导出的功能" → AI添加导出按钮和全选逻辑</p>
+        <span class="ds-tag">✨ 灵活感：像跟同事说话一样修改页面</span>
+      </div>
+    </div>
+
+    <div class="demo-step">
+      <div class="ds-num">4</div>
+      <div class="ds-content">
+        <h5>接口文档驱动演示</h5>
+        <div class="ds-time">⏱ 1.5分钟</div>
+        <p><strong>操作：</strong>粘贴后端给的JSON接口定义 → AI自动生成TypeScript类型 + API调用函数 + Mock数据 + 字段映射到表格列</p>
+        <p><strong>展示：</strong>原本需要手写30分钟的API对接代码，10秒生成，类型安全，直接可用。</p>
+        <span class="ds-tag">✨ 数据感：API文档 → 可运行代码，零手工翻译</span>
+      </div>
+    </div>
+
+    <div class="demo-step">
+      <div class="ds-num">5</div>
+      <div class="ds-content">
+        <h5>原型图转代码（如果实现）</h5>
+        <div class="ds-time">⏱ 1分钟</div>
+        <p><strong>操作：</strong>上传一张原型图/页面截图 → AI自动识别布局、按钮、表格、表单字段 → 生成对应代码</p>
+        <p>产品经理画的线框图，3秒变可运行页面。</p>
+        <span class="ds-tag">✨ 跨界感：PM画原型 → 前端直接有代码</span>
+      </div>
+    </div>
+
+    <div class="demo-step">
+      <div class="ds-num">6</div>
+      <div class="ds-content">
+        <h5>价值总结与收尾</h5>
+        <div class="ds-time">⏱ 1.5分钟</div>
+        <p><strong>数据对比：</strong>现场展示传统方式 vs 码搭的时间对比——4个页面，传统2天 → 码搭8分钟生成 + 30分钟微调</p>
+        <p><strong>差异化强调：</strong>"Cursor帮你写一行代码，码搭帮你搭一个页面。区别在于，码搭懂你公司的组件库、懂你的编码规范、懂你的页面模式——它不是一个通用助手，是你们团队专属的AI前端工程师。"</p>
+        <span class="ds-tag">🎯 收尾记忆点：专属、页面级、企业定制</span>
+      </div>
+    </div>
+
+    <div class="hl-box blue">
+      <strong>评委记忆点设计：</strong>①「30秒出一个完整页面」的速度震撼；②「不懂公司组件库的AI不是好前端」的差异化认知；③「说句话就改」的对话体验。三个记忆点形成「快 → 准 → 活」的递进认知。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 10. 项目创新亮点 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">10</span>
+    <span class="section-title">项目创新亮点</span>
+    <div class="section-desc">与现有AI编程工具的差异化创新</div>
+  </div>
+  <div class="section-body">
+
+    <div class="card-grid card-grid-2">
+      <div class="card" style="border-left:4px solid var(--primary);">
+        <div class="card-icon" style="background:var(--primary-bg);color:var(--primary);">🏭</div>
+        <h4>创新1：从「代码助手」到「页面工厂」</h4>
+        <p>不是生成代码片段，而是生成完整的、可运行的页面。包含组件编排、数据流、接口调用、Mock数据——拿来就能跑。</p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--accent);">
+        <div class="card-icon" style="background:var(--accent-bg);color:var(--accent);">📚</div>
+        <h4>创新2：企业组件库深度认知</h4>
+        <p>通过RAG将公司组件库文档、示例、规范向量化，AI生成代码时100%使用企业组件，天然符合团队规范。这是Cursor/Copilot做不到的。</p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--success);">
+        <div class="card-icon" style="background:var(--success-bg);color:var(--success);">🔗</div>
+        <h4>创新3：需求→接口→页面一体化</h4>
+        <p>打通「PRD → 页面结构 → 组件匹配 → API对接 → Mock数据」全链路。不是单点AI增强，而是流程级自动化。</p>
+      </div>
+      <div class="card" style="border-left:4px solid var(--warning);">
+        <div class="card-icon" style="background:var(--warning-bg);color:var(--warning);">💬</div>
+        <h4>创新4：页面级对话记忆</h4>
+        <p>不只是聊天上下文，而是页面级的完整状态记忆。用户说「把表格改成卡片」，AI知道当前页面的所有组件、数据、状态，精准修改而不破坏其他部分。</p>
+      </div>
+      <div class="card" style="border-left:4px solid #EC4899;">
+        <div class="card-icon" style="background:#FCE7F3;color:#BE185D;">🧩</div>
+        <h4>创新5：Agent多步骤编排</h4>
+        <p>不依赖单次LLM调用生成代码，而是通过多个专业化Agent（意图解析→组件检索→代码生成）协作完成，每个Agent专注自己的领域，质量更高、可控性更强。</p>
+      </div>
+      <div class="card" style="border-left:4px solid #8B5CF6;">
+        <div class="card-icon" style="background:#F3E8FF;color:#7C3AED;">🔄</div>
+        <h4>创新6：页面模板沉淀与复用</h4>
+        <p>每次生成的页面自动沉淀为可搜索的模板，团队积累越多，AI越「懂」业务。从单次生成升级为组织知识沉淀，形成正向飞轮。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 11. 项目落地价值 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">11</span>
+    <span class="section-title">项目落地价值</span>
+    <div class="section-desc">可量化的提效数据 + 多维度业务价值</div>
+  </div>
+  <div class="section-body">
+
+    <div class="metrics-grid">
+      <div class="metric-card"><div class="mv">70<span class="mu">%</span></div><div class="ml">页面搭建效率提升</div></div>
+      <div class="metric-card"><div class="mv">100<span class="mu">%</span></div><div class="ml">企业组件使用率</div></div>
+      <div class="metric-card"><div class="mv">85<span class="mu">%</span></div><div class="ml">接口对接自动化率</div></div>
+      <div class="metric-card"><div class="mv">1<span class="mu">天</span></div><div class="ml">新人独立产出周期</div></div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 12px;">📊 多维度价值矩阵</h3>
+    <table class="data-table">
+      <thead>
+        <tr><th>维度</th><th>当前状态</th><th>码搭后</th><th>价值</th></tr>
+      </thead>
+      <tbody>
+        <tr><td><strong>个人效率</strong></td><td>列表页 4-6小时/个</td><td>30秒生成 + 30分钟微调</td><td><span class="tag tag-green">↑ 80%</span></td></tr>
+        <tr><td><strong>团队产出</strong></td><td>10人周产约20个页面</td><td>10人周产约40个页面</td><td><span class="tag tag-green">↑ 100%</span></td></tr>
+        <tr><td><strong>代码质量</strong></td><td>组件使用不规范、魔改严重</td><td>100%使用公司组件</td><td><span class="tag tag-green">↑ 标准化</span></td></tr>
+        <tr><td><strong>新人培养</strong></td><td>2周才能独立写页面</td><td>1天即可产出标准页面</td><td><span class="tag tag-green">↑ 14x加速</span></td></tr>
+        <tr><td><strong>知识沉淀</strong></td><td>靠人传帮带</td><td>模板库+组件知识库</td><td><span class="tag tag-green">知识资产化</span></td></tr>
+        <tr><td><strong>跨项目复用</strong></td><td>Copy-paste-adapt</td><td>语义搜索+一键复用</td><td><span class="tag tag-green">↑ 复用率</span></td></tr>
+      </tbody>
+    </table>
+
+    <div class="hl-box green">
+      <strong>年度ROI估算：</strong>假设公司有30人前端团队，平均每人每周搭建4个中后台页面，每个页面节省3小时 = 每周节省360人时 ≈ 2个全职工程师。按年均薪资25万计算，年化节省约50万人力成本。更重要的是交付速度提升带来业务价值。
+    </div>
+
+  </div>
+</div>
+
+<!-- ===== 12. 后续商业化与扩展方向 ===== -->
+<div class="section">
+  <div class="section-header">
+    <span class="section-num">12</span>
+    <span class="section-title">后续商业化与扩展方向</span>
+    <div class="section-desc">从内部工具到平台产品的演进路径</div>
+  </div>
+  <div class="section-body">
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin-bottom:16px;">🚀 三阶段演进路线</h3>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--primary);"></div><div class="phase-line"></div></div>
+      <div class="phase-body">
+        <h4>阶段一：内部提效工具 <span class="tag tag-red">黑客松 → 3个月</span></h4>
+        <div class="pt">在公司内部作为前端效能工具推广</div>
+        <ul>
+          <li>覆盖公司前端团队，作为标配开发工具</li>
+          <li>接入公司Vue/React组件库和业务组件</li>
+          <li>沉淀100+页面模板，覆盖中后台高频场景</li>
+          <li>集成CI/CD，生成代码直接创建MR</li>
+          <li>量化提效数据，形成内部成功案例</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--accent);"></div><div class="phase-line"></div></div>
+      <div class="phase-body">
+        <h4>阶段二：行业SaaS产品 <span class="tag tag-yellow">6-12个月</span></h4>
+        <div class="pt">面向外部企业客户提供标准化产品</div>
+        <ul>
+          <li>支持多组件库生态（Ant Design、Element、Arco Design、TDesign等）</li>
+          <li>开放组件库配置平台，企业可自行接入</li>
+          <li>SaaS + 私有化部署双模式</li>
+          <li>按团队规模/生成次数定价</li>
+          <li>目标客户：中大型互联网公司、传统企业数字化团队</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="phase-row">
+      <div class="phase-timeline"><div class="phase-dot" style="border-color:var(--success);"></div></div>
+      <div class="phase-body">
+        <h4>阶段三：平台生态 <span class="tag tag-blue">12个月+</span></h4>
+        <div class="pt">打造前端研发效能平台</div>
+        <ul>
+          <li>开放Plugin市场，第三方组件库/模板供应商接入</li>
+          <li>从页面生成扩展到全栈应用生成（含后端BFF层）</li>
+          <li>AI驱动的项目初始化 + 架构设计 + 持续维护</li>
+          <li>与主流低代码平台差异化竞争——当前低代码是「拖拽搭建」，码搭是「AI自动搭建」，更智能</li>
+          <li>探索「AI前端工程师 Agent」——不只是生成代码，而是作为虚拟团队成员持续参与开发</li>
+        </ul>
+      </div>
+    </div>
+
+    <h3 style="font-size:17px;font-weight:700;color:var(--dark);margin:28px 0 16px;">💡 商业化关键路径</h3>
+    <div class="card-grid card-grid-3">
+      <div class="card">
+        <div class="card-icon" style="background:var(--primary-bg);color:var(--primary);">🏢</div>
+        <h4>内部验证</h4>
+        <p>在公司内部跑通闭环，积累数据和使用案例，证明价值。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:var(--accent-bg);color:var(--accent);">🔌</div>
+        <h4>生态兼容</h4>
+        <p>支持主流组件库，降低企业接入门槛，扩大目标市场。</p>
+      </div>
+      <div class="card">
+        <div class="card-icon" style="background:var(--success-bg);color:var(--success);">📈</div>
+        <h4>价值定价</h4>
+        <p>按提效价值定价（每生成一个页面节省¥X），而非按使用量。</p>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Footer -->
+<div class="footer">
+  <div class="fl">码搭 CodeForge</div>
+  <p>AI 前端页面智能搭建助手 · 黑客松参赛方案</p>
+  <p style="margin-top:4px;opacity:0.6;">"说句话，页面就有了"</p>
+</div>
+
+</div>
+</body>
+</html>

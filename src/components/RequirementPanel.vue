@@ -11,14 +11,33 @@
       </div>
     </div>
 
+    <!-- Input Mode Tabs -->
+    <div class="rp-mode-tabs">
+      <button
+        class="mode-tab"
+        :class="{ active: inputMode === 'requirement' }"
+        @click="$emit('update:inputMode', 'requirement')"
+      >
+        💬 需求描述
+      </button>
+      <button
+        class="mode-tab"
+        :class="{ active: inputMode === 'api' }"
+        @click="$emit('update:inputMode', 'api')"
+      >
+        📡 接口文档
+      </button>
+    </div>
+
     <!-- Chat Area -->
     <div class="rp-chat" ref="chatContainer">
-      <!-- Welcome message -->
       <div v-if="chatHistory.length === 0" class="rp-welcome">
         <div class="welcome-icon">🚀</div>
         <h3>欢迎使用码搭</h3>
-        <p>描述你想要的页面，AI 自动生成 Vue3 代码</p>
-        <div class="welcome-examples">
+        <p v-if="inputMode === 'requirement'">描述你想要的页面，AI 自动生成 Vue3 代码</p>
+        <p v-else>粘贴 Swagger JSON、Knife4j 文档或自定义 JSON，自动生成页面代码</p>
+
+        <div v-if="inputMode === 'requirement'" class="welcome-examples">
           <div class="examples-title">💡 试试这些示例：</div>
           <div
             v-for="(ex, i) in examples"
@@ -30,9 +49,20 @@
             <span class="example-text">{{ ex }}</span>
           </div>
         </div>
+
+        <div v-else class="welcome-examples">
+          <div class="examples-title">💡 试试这些方式：</div>
+          <div class="example-item" @click="$emit('loadApiExample')">
+            <span class="example-num">🔗</span>
+            <span class="example-text">粘贴 Knife4j 链接（自动拉取 Swagger）</span>
+          </div>
+          <div class="example-item" @click="$emit('loadApiMarkdownExample')">
+            <span class="example-num">📋</span>
+            <span class="example-text">粘贴复制的接口文档内容（Markdown）</span>
+          </div>
+        </div>
       </div>
 
-      <!-- Chat messages -->
       <div v-for="(msg, i) in chatHistory" :key="i" class="rp-msg" :class="`rp-msg--${msg.role}`">
         <div class="msg-avatar">{{ msg.role === 'user' ? '👤' : '🤖' }}</div>
         <div class="msg-body">
@@ -41,7 +71,6 @@
         </div>
       </div>
 
-      <!-- Loading -->
       <div v-if="isLoading" class="rp-msg rp-msg--assistant">
         <div class="msg-avatar">🤖</div>
         <div class="msg-body">
@@ -56,24 +85,41 @@
       </div>
     </div>
 
+    <!-- Modification hints -->
+    <div v-if="hasResult && inputMode === 'requirement'" class="rp-modify-hints">
+      <div class="hints-title">✏️ 继续修改页面：</div>
+      <div class="hints-list">
+        <button
+          v-for="(hint, i) in modificationHints"
+          :key="i"
+          class="hint-chip"
+          :disabled="isLoading"
+          @click="$emit('loadModificationHint', hint)"
+        >
+          {{ hint }}
+        </button>
+      </div>
+    </div>
+
     <!-- Input Area -->
     <div class="rp-input-area">
       <textarea
         v-model="inputText"
         class="rp-textarea"
+        :class="{ 'rp-textarea--api': inputMode === 'api' }"
         :placeholder="placeholderText"
         :disabled="isLoading"
-        @keydown.ctrl.enter="handleGenerate"
-        rows="3"
+        @keydown.ctrl.enter="handleSubmit"
+        :rows="inputMode === 'api' ? 6 : 3"
       ></textarea>
       <div class="rp-input-actions">
-        <span class="rp-hint">Ctrl + Enter 快速生成</span>
+        <span class="rp-hint">Ctrl + Enter 快速{{ hasResult && inputMode === 'requirement' ? '发送' : '生成' }}</span>
         <button
           class="rp-generate-btn"
           :disabled="!inputText.trim() || isLoading"
-          @click="handleGenerate"
+          @click="handleSubmit"
         >
-          {{ isLoading ? '生成中...' : '⚡ 生成页面' }}
+          {{ submitButtonText }}
         </button>
       </div>
     </div>
@@ -81,27 +127,49 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
-import type { ChatMessage } from '../types'
+import { ref, watch, nextTick, computed } from 'vue'
+import type { ChatMessage, InputMode } from '../types'
 
 const props = defineProps<{
   chatHistory: ChatMessage[]
   isLoading: boolean
   loadingStep: string
   examples: string[]
+  modificationHints: string[]
   requirement: string
+  inputMode: InputMode
+  hasResult: boolean
 }>()
 
 const emit = defineEmits<{
-  generate: [text: string]
+  submit: [text: string]
   loadExample: [text: string]
+  loadApiExample: []
+  loadApiMarkdownExample: []
+  loadModificationHint: [text: string]
   'update:requirement': [text: string]
+  'update:inputMode': [InputMode]
 }>()
 
 const inputText = ref(props.requirement)
 const chatContainer = ref<HTMLElement>()
 
-const placeholderText = '描述你想要的页面，例如：\n创建一个设备管理列表页，展示设备编号、名称、类型、状态，支持按名称筛选，支持新增和编辑'
+const placeholderText = computed(() => {
+  if (props.inputMode === 'api') {
+    return '支持粘贴 Knife4j 链接，例如：\nhttp://192.168.0.102:30303/doc.html#/分组/标签/getDetail_48\n\n码搭会自动拉取 Swagger 定义并生成页面（需 npm run dev 启动）'
+  }
+  if (props.hasResult) {
+    return '继续描述修改，例如：\n给表格增加操作列，包含编辑和删除按钮'
+  }
+  return '描述你想要的页面，例如：\n创建一个设备管理列表页，展示设备编号、名称、类型、状态，支持按名称筛选，支持新增和编辑'
+})
+
+const submitButtonText = computed(() => {
+  if (props.isLoading) return '处理中...'
+  if (props.hasResult && props.inputMode === 'requirement') return '✏️ 发送修改'
+  if (props.inputMode === 'api') return '📡 解析生成'
+  return '⚡ 生成页面'
+})
 
 watch(() => props.requirement, (val) => {
   inputText.value = val
@@ -111,26 +179,24 @@ watch(inputText, (val) => {
   emit('update:requirement', val)
 })
 
-// Auto scroll to bottom
-watch(() => props.chatHistory.length, () => {
+watch(() => props.chatHistory.length, scrollToBottom)
+watch(() => props.isLoading, scrollToBottom)
+
+function scrollToBottom() {
   nextTick(() => {
     if (chatContainer.value) {
       chatContainer.value.scrollTop = chatContainer.value.scrollHeight
     }
   })
-})
+}
 
-watch(() => props.isLoading, () => {
-  nextTick(() => {
-    if (chatContainer.value) {
-      chatContainer.value.scrollTop = chatContainer.value.scrollHeight
-    }
-  })
-})
-
-function handleGenerate() {
+function handleSubmit() {
   if (!inputText.value.trim() || props.isLoading) return
-  emit('generate', inputText.value)
+  emit('submit', inputText.value)
+  if (props.hasResult && props.inputMode === 'requirement') {
+    inputText.value = ''
+    emit('update:requirement', '')
+  }
 }
 
 function formatContent(content: string): string {
@@ -166,13 +232,39 @@ function formatContent(content: string): string {
 .rp-logo-name { font-size: 18px; font-weight: 700; color: #1e293b; }
 .rp-logo-desc { font-size: 12px; color: #94a3b8; }
 
+.rp-mode-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 8px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+.mode-tab {
+  flex: 1;
+  padding: 8px 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #64748b;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.mode-tab:hover { border-color: #c7d2fe; color: #4338ca; }
+.mode-tab.active {
+  background: #eef2ff;
+  border-color: #6366f1;
+  color: #4338ca;
+}
+
 .rp-chat {
   flex: 1;
   overflow-y: auto;
   padding: 16px 20px;
 }
 
-/* Welcome */
 .rp-welcome {
   text-align: center;
   padding: 20px 0;
@@ -200,7 +292,6 @@ function formatContent(content: string): string {
   font-weight: 700;
 }
 
-/* Messages */
 .rp-msg {
   display: flex; gap: 10px; margin-bottom: 16px;
 }
@@ -224,7 +315,6 @@ function formatContent(content: string): string {
   background: #eef2ff; border-color: #e0e7ff; color: #3730a3;
 }
 
-/* Loading */
 .msg-loading {
   display: flex; align-items: center; gap: 10px;
   background: #f8fafc; padding: 10px 14px; border-radius: 10px;
@@ -244,7 +334,31 @@ function formatContent(content: string): string {
 }
 .loading-text { font-size: 13px; color: #64748b; }
 
-/* Input */
+.rp-modify-hints {
+  padding: 8px 20px;
+  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+  background: #fafbff;
+}
+.hints-title { font-size: 12px; color: #64748b; margin-bottom: 6px; }
+.hints-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.hint-chip {
+  padding: 4px 10px;
+  border: 1px solid #e0e7ff;
+  background: #fff;
+  border-radius: 50px;
+  font-size: 11px;
+  color: #4338ca;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.hint-chip:hover:not(:disabled) {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+.hint-chip:disabled { opacity: 0.5; cursor: not-allowed; }
+
 .rp-input-area {
   padding: 12px 20px 16px;
   border-top: 1px solid #f0f0f0;
@@ -262,6 +376,10 @@ function formatContent(content: string): string {
   font-family: inherit;
   color: #334155;
   transition: border-color 0.2s;
+}
+.rp-textarea--api {
+  font-family: 'Cascadia Code', 'Consolas', monospace;
+  font-size: 12px;
 }
 .rp-textarea:focus { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99,102,241,0.1); }
 .rp-textarea::placeholder { color: #cbd5e1; }

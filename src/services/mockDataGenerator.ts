@@ -1,4 +1,4 @@
-import type { ParsedField } from '../types'
+import type { ParsedField, ParsedRequirement } from '../types'
 
 function randomDate(): string {
   const now = Date.now()
@@ -58,4 +58,16 @@ export function generateMockData(fields: ParsedField[], count = 8): Record<strin
     data.push(row)
   }
   return data
+}
+
+/** 详情页 Mock：基本信息 + 各子表格区块 */
+export function generateDetailMockData(parsed: ParsedRequirement): Record<string, any> {
+  const detail: Record<string, any> = {}
+  for (const field of parsed.fields) {
+    detail[field.name] = generateValue(field, 0)
+  }
+  for (const section of parsed.detailSections || []) {
+    detail[section.name] = generateMockData(section.columns, 3)
+  }
+  return detail
 }

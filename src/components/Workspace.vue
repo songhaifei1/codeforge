@@ -1,22 +1,26 @@
 <template>
   <div class="workspace">
-    <!-- Left: Requirement Panel -->
     <div class="workspace-left">
       <RequirementPanel
         :chat-history="store.chatHistory"
         :is-loading="store.isLoading"
         :loading-step="store.loadingStep"
         :examples="store.examples"
+        :modification-hints="store.modificationHints"
         :requirement="store.requirement"
-        @generate="handleGenerate"
+        :input-mode="store.inputMode"
+        :has-result="store.hasResult"
+        @submit="store.submitInput"
         @load-example="store.loadExample"
+        @load-api-example="store.loadApiExample"
+        @load-api-markdown-example="store.loadApiMarkdownExample"
+        @load-modification-hint="store.loadModificationHint"
         @update:requirement="store.requirement = $event"
+        @update:input-mode="store.inputMode = $event"
       />
     </div>
 
-    <!-- Right: Code / Preview Panel -->
     <div class="workspace-right">
-      <!-- Tab Bar -->
       <div class="workspace-tabs">
         <button
           class="tab-btn"
@@ -34,12 +38,14 @@
         </button>
         <div class="tab-info" v-if="store.generatedResult">
           <span class="tab-info-item">
-            {{ store.generatedResult.entityName }} · {{ store.generatedResult.mockData.length }} 条Mock数据
+            {{ store.generatedResult.entityName }} · {{ store.generatedResult.mockData.length }} 条Mock
+          </span>
+          <span v-if="store.generatedResult.matchedComponents?.length" class="tab-info-item tab-info-item--comp">
+            {{ store.generatedResult.matchedComponents.length }} 个组件
           </span>
         </div>
       </div>
 
-      <!-- Tab Content -->
       <div class="workspace-tab-content">
         <PreviewPanel
           v-show="store.activeTab === 'preview'"
@@ -47,7 +53,10 @@
         />
         <CodePanel
           v-show="store.activeTab === 'code'"
-          :code="store.generatedResult?.sfcCode || ''"
+          :page-code="store.generatedResult?.sfcCode || ''"
+          :api-code="store.generatedResult?.apiCode || ''"
+          :code-tab="store.codeTab"
+          @update:code-tab="store.codeTab = $event"
         />
       </div>
     </div>
@@ -61,11 +70,6 @@ import CodePanel from './CodePanel.vue'
 import PreviewPanel from './PreviewPanel.vue'
 
 const store = useWorkspaceStore()
-
-function handleGenerate(text: string) {
-  store.requirement = text
-  store.generate()
-}
 </script>
 
 <style scoped>
@@ -121,6 +125,8 @@ function handleGenerate(text: string) {
 .tab-info {
   margin-left: auto;
   font-size: 12px;
+  display: flex;
+  gap: 8px;
 }
 
 .tab-info-item {
@@ -128,6 +134,11 @@ function handleGenerate(text: string) {
   background: #f1f5f9;
   padding: 4px 10px;
   border-radius: 50px;
+}
+
+.tab-info-item--comp {
+  background: #eef2ff;
+  color: #6366f1;
 }
 
 .workspace-tab-content {

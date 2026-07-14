@@ -1,7 +1,25 @@
 <template>
   <div class="code-panel">
     <div class="code-toolbar">
-      <span class="code-title">生成的代码</span>
+      <div class="code-toolbar-left">
+        <span class="code-title">生成的代码</span>
+        <div v-if="hasApiCode" class="code-subtabs">
+          <button
+            class="code-subtab"
+            :class="{ active: codeTab === 'page' }"
+            @click="$emit('update:codeTab', 'page')"
+          >
+            页面代码
+          </button>
+          <button
+            class="code-subtab"
+            :class="{ active: codeTab === 'api' }"
+            @click="$emit('update:codeTab', 'api')"
+          >
+            API 代码
+          </button>
+        </div>
+      </div>
       <div class="code-actions">
         <span v-if="lineCount" class="code-info">{{ lineCount }} 行</span>
         <button class="code-copy" @click="copyCode">
@@ -10,7 +28,7 @@
       </div>
     </div>
     <div class="code-content">
-      <div v-if="!code" class="code-empty">
+      <div v-if="!activeCode" class="code-empty">
         <div class="empty-icon">📝</div>
         <p>生成的 Vue3 代码将在这里展示</p>
       </div>
@@ -20,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed } from 'vue'
 import hljs from 'highlight.js/lib/core'
 import xml from 'highlight.js/lib/languages/xml'
 import typescript from 'highlight.js/lib/languages/typescript'
@@ -29,19 +47,32 @@ hljs.registerLanguage('xml', xml)
 hljs.registerLanguage('typescript', typescript)
 
 const props = defineProps<{
-  code: string
+  pageCode: string
+  apiCode: string
+  codeTab: 'page' | 'api'
+}>()
+
+defineEmits<{
+  'update:codeTab': ['page' | 'api']
 }>()
 
 const copied = ref(false)
 
+const hasApiCode = computed(() => !!props.apiCode)
+
+const activeCode = computed(() => {
+  if (props.codeTab === 'api' && props.apiCode) return props.apiCode
+  return props.pageCode
+})
+
 const highlightedCode = computed(() => {
-  if (!props.code) return ''
+  if (!activeCode.value) return ''
   try {
-    // Vue SFC is primarily XML-like with embedded TypeScript
-    const result = hljs.highlight(props.code, { language: 'xml' })
+    const lang = props.codeTab === 'api' ? 'typescript' : 'xml'
+    const result = hljs.highlight(activeCode.value, { language: lang })
     return result.value
   } catch {
-    return props.code
+    return activeCode.value
       .replace(/&/g, '&amp;')
       .replace(/</g, '&lt;')
       .replace(/>/g, '&gt;')
@@ -49,19 +80,18 @@ const highlightedCode = computed(() => {
 })
 
 const lineCount = computed(() => {
-  if (!props.code) return 0
-  return props.code.split('\n').length
+  if (!activeCode.value) return 0
+  return activeCode.value.split('\n').length
 })
 
 async function copyCode() {
   try {
-    await navigator.clipboard.writeText(props.code)
+    await navigator.clipboard.writeText(activeCode.value)
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
   } catch {
-    // Fallback
     const textarea = document.createElement('textarea')
-    textarea.value = props.code
+    textarea.value = activeCode.value
     document.body.appendChild(textarea)
     textarea.select()
     document.execCommand('copy')
@@ -88,7 +118,30 @@ async function copyCode() {
   border-bottom: 1px solid #3e3e42;
   flex-shrink: 0;
 }
+.code-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
 .code-title { font-size: 14px; font-weight: 600; color: #cccccc; }
+.code-subtabs { display: flex; gap: 4px; }
+.code-subtab {
+  padding: 4px 10px;
+  border: 1px solid #3e3e42;
+  background: #2d2d30;
+  color: #858585;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+  font-family: inherit;
+}
+.code-subtab:hover { color: #ccc; }
+.code-subtab.active {
+  background: #37373d;
+  color: #fff;
+  border-color: #6366f1;
+}
 .code-actions { display: flex; align-items: center; gap: 10px; }
 .code-info { font-size: 12px; color: #858585; }
 .code-copy {

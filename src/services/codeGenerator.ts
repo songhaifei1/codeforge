@@ -1,6 +1,7 @@
 import { ref, reactive } from 'vue'
 import type { ParsedRequirement, GeneratedResult, ParsedField, ParsedAction } from '../types'
-import { generateMockData } from './mockDataGenerator'
+import { generateMockData, generateDetailMockData } from './mockDataGenerator'
+import { matchComponents } from '../knowledge/componentKnowledge'
 
 // ===== 辅助函数 =====
 
@@ -29,6 +30,13 @@ function getImportList(parsed: ParsedRequirement): string {
     if (parsed.fields.some(f => f.type === 'select')) components.add('CfSelect')
     if (parsed.fields.some(f => f.type === 'date')) components.add('CfDatePicker')
     if (parsed.fields.some(f => f.type === 'textarea')) components.add('CfInput')
+  } else if (parsed.pageType === 'detail') {
+    components.add('CfButton')
+    components.add('CfTag')
+    if (parsed.detailSections?.length) components.add('CfTable')
+  } else if (parsed.pageType === 'dashboard') {
+    components.add('CfTable')
+    if (parsed.fields.some(f => f.type === 'tag')) components.add('CfTag')
   } else {
     components.add('CfTag')
   }
@@ -74,8 +82,8 @@ function generateListTemplate(parsed: ParsedRequirement): string {
   html += `${indent}<cf-table :data="tableData" :columns="columns">\n`
   for (const f of fields) {
     if (f.type === 'tag') {
-      html += `${indent}  <template #${f.field}="{ row }">\n`
-      html += `${indent}    <cf-tag :type="getTagType(row.${f.field})">{{ row.${f.field} }}</cf-tag>\n`
+      html += `${indent}  <template #${f.name}="{ row }">\n`
+      html += `${indent}    <cf-tag :type="getTagType(row.${f.name})">{{ row.${f.name} }}</cf-tag>\n`
       html += `${indent}  </template>\n`
     }
   }
@@ -125,7 +133,7 @@ function generateFormTemplate(parsed: ParsedRequirement): string {
 }
 
 function generateDetailTemplate(parsed: ParsedRequirement): string {
-  const { fields, pageTitle } = parsed
+  const { fields, pageTitle, detailSections } = parsed
   let html = `<div class="page-container">\n`
   html += `  <cf-card title="${pageTitle}">\n`
   html += `    <div class="detail-list">\n`
@@ -140,9 +148,45 @@ function generateDetailTemplate(parsed: ParsedRequirement): string {
     html += `      </div>\n`
   }
   html += `    </div>\n`
+
+  if (detailSections && detailSections.length > 0) {
+    for (const section of detailSections) {
+      html += `    <div class="detail-section">\n`
+      html += `      <div class="section-title">${section.label}</div>\n`
+      html += `      <cf-table :data="detailData.${section.name} || []" :columns="sectionColumns['${section.name}']" />\n`
+      html += `    </div>\n`
+    }
+  }
+
   html += `    <div class="detail-footer">\n`
   html += `      <cf-button @click="handleBack">返回</cf-button>\n`
   html += `    </div>\n`
+  html += `  </cf-card>\n</div>`
+  return html
+}
+
+function generateDashboardTemplate(parsed: ParsedRequirement): string {
+  const { fields, pageTitle } = parsed
+  const indent = '    '
+  let html = `<div class="page-container">\n`
+  html += `  <cf-card title="${pageTitle}">\n`
+  html += `${indent}<div class="stat-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">\n`
+  html += `${indent}  <div v-for="item in statCards" :key="item.key" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">\n`
+  html += `${indent}    <div style="font-size:13px;color:#64748b;margin-bottom:8px">{{ item.label }}</div>\n`
+  html += `${indent}    <div style="font-size:28px;font-weight:700;color:#1e293b">{{ item.value }}</div>\n`
+  html += `${indent}    <div :style="{ fontSize: '12px', marginTop: '6px', color: item.trend === 'up' ? '#10b981' : '#ef4444' }">{{ item.trendText }}</div>\n`
+  html += `${indent}  </div>\n`
+  html += `${indent}</div>\n`
+  html += `${indent}<div style="font-size:15px;font-weight:600;color:#334155;margin-bottom:12px">近期数据</div>\n`
+  html += `${indent}<cf-table :data="tableData" :columns="columns">\n`
+  for (const f of fields) {
+    if (f.type === 'tag') {
+      html += `${indent}  <template #${f.name}="{ row }">\n`
+      html += `${indent}    <cf-tag :type="getTagType(row.${f.name})">{{ row.${f.name} }}</cf-tag>\n`
+      html += `${indent}  </template>\n`
+    }
+  }
+  html += `${indent}</cf-table>\n`
   html += `  </cf-card>\n</div>`
   return html
 }
@@ -151,6 +195,7 @@ function generateTemplate(parsed: ParsedRequirement): string {
   switch (parsed.pageType) {
     case 'form': return generateFormTemplate(parsed)
     case 'detail': return generateDetailTemplate(parsed)
+    case 'dashboard': return generateDashboardTemplate(parsed)
     default: return generateListTemplate(parsed)
   }
 }
@@ -164,7 +209,12 @@ function createListSetup(parsed: ParsedRequirement, mockData: any[]) {
     const currentPage = ref(1)
     const total = ref(mockData.length)
 
-    const columns = fields.map(f => ({
+    const columns: Array<{
+      prop: string
+      label: string
+      width?: string
+      align?: 'left' | 'center' | 'right'
+    }> = fields.map(f => ({
       prop: f.name,
       label: f.label,
       width: f.type === 'date' ? '180px' : f.type === 'textarea' ? '250px' : undefined,
@@ -180,8 +230,8 @@ function createListSetup(parsed: ParsedRequirement, mockData: any[]) {
     const optionKeys: Record<string, { label: string; value: string }[]> = {}
     for (const f of filters) {
       filterForm[f.field] = ''
-      if (f.type === 'select' && f.options) {
-        optionKeys[`${f.field}Options`] = f.options.map(o => ({ label: o, value: o }))
+      if (f.type === 'select') {
+        optionKeys[`${f.field}Options`] = (f.options || []).map(o => ({ label: o, value: o }))
       }
     }
 
@@ -211,8 +261,8 @@ function createFormSetup(parsed: ParsedRequirement, mockData: any[]) {
     const optionKeys: Record<string, { label: string; value: string }[]> = {}
     for (const f of fields) {
       formData[f.name] = f.type === 'select' ? '' : f.type === 'number' ? 0 : ''
-      if (f.type === 'select' && f.options) {
-        optionKeys[`${f.name}Options`] = f.options.map(o => ({ label: o, value: o }))
+      if (f.type === 'select') {
+        optionKeys[`${f.name}Options`] = (f.options || []).map(o => ({ label: o, value: o }))
       }
     }
 
@@ -228,11 +278,39 @@ function createFormSetup(parsed: ParsedRequirement, mockData: any[]) {
 }
 
 function createDetailSetup(parsed: ParsedRequirement, mockData: any[]) {
-  const { fields } = parsed
+  const { detailSections } = parsed
   return () => {
     const detailData = ref(mockData[0] || {})
+    const sectionColumns: Record<string, Array<{ prop: string; label: string; width?: string }>> = {}
+    for (const section of detailSections || []) {
+      sectionColumns[section.name] = section.columns.map(f => ({
+        prop: f.name,
+        label: f.label,
+        width: f.type === 'date' ? '180px' : undefined,
+      }))
+    }
     const handleBack = () => { alert('返回上一页') }
-    return { detailData, handleBack, getTagType }
+    return { detailData, sectionColumns, handleBack, getTagType }
+  }
+}
+
+function createDashboardSetup(parsed: ParsedRequirement, mockData: any[]) {
+  const { fields, entityName } = parsed
+  return () => {
+    const tableData = ref(mockData)
+    const columns = fields.map(f => ({
+      prop: f.name,
+      label: f.label,
+      width: f.type === 'date' ? '180px' : undefined,
+      align: 'left' as const,
+    }))
+    const statCards = ref([
+      { key: 'total', label: `${entityName}总数`, value: '1,286', trend: 'up', trendText: '↑ 12% 较上周' },
+      { key: 'running', label: '运行中', value: '1,102', trend: 'up', trendText: '↑ 3.2%' },
+      { key: 'fault', label: '故障数', value: '23', trend: 'down', trendText: '↓ 8 台' },
+      { key: 'rate', label: '设备完好率', value: '98.2%', trend: 'up', trendText: '↑ 0.5%' },
+    ])
+    return { tableData, columns, statCards, getTagType }
   }
 }
 
@@ -240,6 +318,7 @@ function createSetup(parsed: ParsedRequirement, mockData: any[]) {
   switch (parsed.pageType) {
     case 'form': return createFormSetup(parsed, mockData)
     case 'detail': return createDetailSetup(parsed, mockData)
+    case 'dashboard': return createDashboardSetup(parsed, mockData)
     default: return createListSetup(parsed, mockData)
   }
 }
@@ -283,9 +362,9 @@ function generateListSFC(parsed: ParsedRequirement, mockData: any[]): string {
     script += `})\n\n`
     // Options
     for (const f of filters) {
-      if (f.type === 'select' && f.options) {
+      if (f.type === 'select') {
         script += `const ${f.field}Options = [\n`
-        for (const opt of f.options) {
+        for (const opt of f.options || []) {
           script += `  { label: '${opt}', value: '${opt}' },\n`
         }
         script += `]\n\n`
@@ -342,9 +421,9 @@ function generateFormSFC(parsed: ParsedRequirement, mockData: any[]): string {
   script += `})\n\n`
 
   for (const f of fields) {
-    if (f.type === 'select' && f.options) {
+    if (f.type === 'select') {
       script += `const ${f.name}Options = [\n`
-      for (const opt of f.options) {
+      for (const opt of f.options || []) {
         script += `  { label: '${opt}', value: '${opt}' },\n`
       }
       script += `]\n\n`
@@ -364,18 +443,30 @@ function generateFormSFC(parsed: ParsedRequirement, mockData: any[]): string {
 }
 
 function generateDetailSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  const { fields, pageTitle } = parsed
   const imports = getImportList(parsed)
   const template = generateDetailTemplate(parsed)
 
   let script = `import { ref } from 'vue'\n`
   script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
-  script += `// 详情数据\n`
   script += `const detailData = ref(${JSON.stringify(mockData[0] || {}, null, 2)})\n\n`
+
+  if (parsed.detailSections?.length) {
+    script += `const sectionColumns = {\n`
+    for (const section of parsed.detailSections) {
+      script += `  ${section.name}: [\n`
+      for (const col of section.columns) {
+        const width = col.type === 'date' ? ", width: '180px'" : ''
+        script += `    { prop: '${col.name}', label: '${col.label}'${width} },\n`
+      }
+      script += `  ],\n`
+    }
+    script += `}\n\n`
+  }
+
   script += `function handleBack() {\n  console.log('返回')\n}\n\n`
   script += `function getTagType(value: string) {\n`
-  script += `  if (/运行中|正常|已完成|成功/.test(value)) return 'success'\n`
-  script += `  if (/故障|异常|错误/.test(value)) return 'danger'\n`
+  script += `  if (/运行中|正常|已完成|成功|通过/.test(value)) return 'success'\n`
+  script += `  if (/故障|异常|错误|未通过|缺考/.test(value)) return 'danger'\n`
   script += `  return 'info'\n`
   script += `}\n`
 
@@ -388,6 +479,51 @@ function generateDetailSFC(parsed: ParsedRequirement, mockData: any[]): string {
   sfc += `.detail-label { width: 120px; text-align: right; color: #666; font-size: 14px; }\n`
   sfc += `.detail-value { color: #333; font-size: 14px; }\n`
   sfc += `.detail-footer { margin-top: 24px; }\n`
+  sfc += `.detail-section { margin-top: 24px; }\n`
+  sfc += `.section-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 12px; }\n`
+  sfc += `</style>\n`
+
+  return sfc
+}
+
+function generateDashboardSFC(parsed: ParsedRequirement, mockData: any[]): string {
+  const imports = getImportList(parsed)
+  const template = generateDashboardTemplate(parsed)
+  const { fields, entityName } = parsed
+
+  let script = `import { ref } from 'vue'\n`
+  script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
+  script += `const tableData = ref(${JSON.stringify(mockData, null, 2)})\n\n`
+  script += `const columns = [\n`
+  for (const f of fields) {
+    const width = f.type === 'date' ? ", width: '180px'" : ''
+    script += `  { prop: '${f.name}', label: '${f.label}'${width} },\n`
+  }
+  script += `]\n\n`
+  script += `const statCards = ref([\n`
+  script += `  { key: 'total', label: '${entityName}总数', value: '1,286', trend: 'up', trendText: '↑ 12% 较上周' },\n`
+  script += `  { key: 'running', label: '运行中', value: '1,102', trend: 'up', trendText: '↑ 3.2%' },\n`
+  script += `  { key: 'fault', label: '故障数', value: '23', trend: 'down', trendText: '↓ 8 台' },\n`
+  script += `  { key: 'rate', label: '设备完好率', value: '98.2%', trend: 'up', trendText: '↑ 0.5%' },\n`
+  script += `])\n\n`
+  script += `function getTagType(value: string) {\n`
+  script += `  if (/运行中|正常|已完成|成功/.test(value)) return 'success'\n`
+  script += `  if (/故障|异常|错误|失败/.test(value)) return 'danger'\n`
+  script += `  return 'info'\n`
+  script += `}\n`
+
+  let sfc = `<template>\n${template}\n</template>\n\n`
+  sfc += `<script setup lang="ts">\n${script}</script>\n\n`
+  sfc += `<style scoped>\n`
+  sfc += `.page-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }\n`
+  sfc += `.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }\n`
+  sfc += `.stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }\n`
+  sfc += `.stat-label { font-size: 13px; color: #64748b; margin-bottom: 8px; }\n`
+  sfc += `.stat-value { font-size: 28px; font-weight: 700; color: #1e293b; }\n`
+  sfc += `.stat-trend { font-size: 12px; margin-top: 6px; }\n`
+  sfc += `.stat-trend.up { color: #10b981; }\n`
+  sfc += `.stat-trend.down { color: #ef4444; }\n`
+  sfc += `.section-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 12px; }\n`
   sfc += `</style>\n`
 
   return sfc
@@ -397,17 +533,21 @@ function generateSFC(parsed: ParsedRequirement, mockData: any[]): string {
   switch (parsed.pageType) {
     case 'form': return generateFormSFC(parsed, mockData)
     case 'detail': return generateDetailSFC(parsed, mockData)
+    case 'dashboard': return generateDashboardSFC(parsed, mockData)
     default: return generateListSFC(parsed, mockData)
   }
 }
 
 // ===== 主入口 =====
 
-export function generateCode(parsed: ParsedRequirement): GeneratedResult {
-  const mockData = generateMockData(parsed.fields, parsed.pageType === 'detail' ? 1 : 8)
+export function generateCode(parsed: ParsedRequirement, options?: { apiCode?: string }): GeneratedResult {
+  const mockData = parsed.pageType === 'detail'
+    ? [generateDetailMockData(parsed)]
+    : generateMockData(parsed.fields, parsed.pageType === 'dashboard' ? 5 : 8)
   const previewTemplate = generateTemplate(parsed)
   const previewSetup = createSetup(parsed, mockData)
   const sfcCode = generateSFC(parsed, mockData)
+  const matched = matchComponents(parsed)
 
   return {
     sfcCode,
@@ -417,5 +557,7 @@ export function generateCode(parsed: ParsedRequirement): GeneratedResult {
     entityName: parsed.entityName,
     mockData,
     parseResult: parsed,
+    apiCode: options?.apiCode,
+    matchedComponents: matched.map(c => c.name),
   }
 }
