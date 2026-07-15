@@ -8,11 +8,10 @@ import { parseApiDocumentAsync, API_DOC_EXAMPLE, API_DOC_URL_EXAMPLE } from '../
 import { formatMatchedComponents, matchComponents } from '../knowledge/componentKnowledge'
 
 const EXAMPLES = [
-  '创建一个设备管理列表页，展示设备编号、设备名称、设备类型、状态、所属车间、最后维护时间，支持按名称和状态筛选，支持新增和编辑',
-  '创建一个设备报警管理页面，展示报警编号、设备名称、报警等级、报警时间、报警内容、状态，支持按设备、等级筛选，并支持查看详情和关闭报警',
-  '创建一个工单录入表单，包含工单标题、工单类型、优先级、描述、负责人字段',
-  '创建一个设备详情页面，展示设备编号、设备名称、设备类型、状态、所属车间、负责人、创建时间、最后维护时间',
-  '创建一个设备数据统计看板，展示设备总数、运行状态、故障率，并列出近期报警数据',
+  '创建一个设备巡检记录页面，展示记录编号、设备名称、巡检时间、巡检人、巡检结果、状态，支持按设备、日期筛选，并支持新增和查看详情',
+  '创建一个设备报警管理页面，展示报警编号、设备名称、报警等级、报警时间、报警内容、状态，支持按设备、等级筛选',
+  '创建一个安全培训管理列表，展示培训名称、培训类型、培训日期、培训人数、状态，支持新增、编辑、导出',
+  '创建一个HSE隐患排查记录管理页面，展示隐患编号、位置、描述、等级、状态、发现日期，支持按等级、状态筛选',
 ]
 
 export const useWorkspaceStore = defineStore('workspace', () => {
@@ -25,11 +24,16 @@ export const useWorkspaceStore = defineStore('workspace', () => {
   const chatHistory = ref<ChatMessage[]>([])
   const activeTab = ref<'code' | 'preview'>('preview')
   const codeTab = ref<'page' | 'api'>('page')
+  /** 当前选中的文件索引 */
+  const activeFileIndex = ref(0)
   const examples = ref(EXAMPLES)
   const modificationHints = ref(MODIFICATION_HINTS)
   const apiDocExample = ref(API_DOC_URL_EXAMPLE)
 
   const hasResult = computed(() => generatedResult.value !== null)
+
+  /** 生成的文件列表（便捷访问） */
+  const generatedFiles = computed(() => generatedResult.value?.files || [])
 
   async function submitInput(text: string) {
     if (!text.trim() || isLoading.value) return
@@ -55,7 +59,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     })
 
     loadingStep.value = '正在分析需求意图...'
-    await delay(400)
+    await delay(300)
     loadingStep.value = '识别页面类型与字段...'
     await delay(400)
 
@@ -66,13 +70,14 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     await delay(400)
     const matched = matchComponents(parsed)
     loadingStep.value = `匹配组件：${formatMatchedComponents(matched)}`
-    await delay(400)
+    await delay(300)
 
-    loadingStep.value = '生成 Vue3 页面代码...'
-    await delay(500)
+    loadingStep.value = '生成 Vue3 页面代码 + API 调用...'
+    await delay(600)
 
     const result = generateCode(parsed)
     generatedResult.value = result
+    activeFileIndex.value = 0
 
     chatHistory.value.push({
       role: 'assistant',
@@ -98,7 +103,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     loadingStep.value = '理解修改意图...'
     await delay(400)
     loadingStep.value = '定位页面结构并应用修改...'
-    await delay(500)
+    await delay(400)
 
     const { parsed, result: modResult } = applyModification(
       generatedResult.value.parseResult,
@@ -119,7 +124,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     loadingStep.value = '重新生成页面代码...'
     await delay(400)
 
-    const result = generateCode(parsed, { apiCode: generatedResult.value.apiCode })
+    const result = generateCode(parsed, { apiCode: generatedResult.value.files.find(f => f.filename.includes('api'))?.code })
     generatedResult.value = result
 
     chatHistory.value.push({
@@ -175,7 +180,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     } catch (err) {
       chatHistory.value.push({
         role: 'assistant',
-        content: `❌ 接口解析失败：${(err as Error).message}\n\n可尝试：\n· 直接粘贴 Knife4j 接口文档内容\n· 确认 Swagger 服务与码搭在同一网络\n· 使用 npm run dev 启动（支持链接自动拉取）`,
+        content: `❌ 接口解析失败：${(err as Error).message}\n\n可尝试：\n· 直接粘贴 Knife4j 接口文档内容\n· 确认 Swagger 服务与码搭在同一网络`,
         timestamp: Date.now(),
       })
     }
@@ -210,13 +215,21 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     }
     if (source === 'api' && apiMeta) {
       lines.push(`📡 接口：${apiMeta.method} ${apiMeta.endpoint}`)
-      lines.push(`📦 已生成 TypeScript 类型 + API 调用 + Mock 数据`)
+    }
+    if (parsed.apiPrefix) {
+      lines.push(`📦 API 前缀：${parsed.apiPrefix}${parsed.apiResource}`)
     }
 
-    lines.push('', '代码已生成，可在右侧预览和查看代码。')
-    if (source === 'generate') {
-      lines.push('', '💡 生成后可继续对话修改，例如：「增加导出按钮」「把状态改成标签展示」')
+    // 多文件输出提示
+    lines.push('', '📂 生成文件：')
+    for (const file of result.files) {
+      const icon = file.filename.includes('api') ? '🔌' : '📄'
+      lines.push(`  ${icon} ${file.filename}`)
     }
+
+    lines.push('', '✅ 代码遵循低代码平台规范（BasicTable/BasicModal/defHttp）')
+    lines.push('📋 可直接复制文件到公司项目使用')
+    lines.push('', '💡 生成后可继续对话修改，例如：「增加导出按钮」「把状态改成标签展示」')
 
     return lines.join('\n')
   }
@@ -247,6 +260,7 @@ export const useWorkspaceStore = defineStore('workspace', () => {
     chatHistory.value = []
     activeTab.value = 'preview'
     codeTab.value = 'page'
+    activeFileIndex.value = 0
     inputMode.value = 'requirement'
   }
 
@@ -257,8 +271,8 @@ export const useWorkspaceStore = defineStore('workspace', () => {
 
   return {
     requirement, inputMode, parseResult, generatedResult, isLoading, loadingStep,
-    chatHistory, activeTab, codeTab, examples, modificationHints, apiDocExample,
-    hasResult,
+    chatHistory, activeTab, codeTab, activeFileIndex, examples, modificationHints, apiDocExample,
+    hasResult, generatedFiles,
     submitInput, generate, modifyPage, generateFromApi,
     loadExample, loadApiExample, loadApiMarkdownExample, loadModificationHint, reset,
   }

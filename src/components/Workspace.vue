@@ -38,10 +38,10 @@
         </button>
         <div class="tab-info" v-if="store.generatedResult">
           <span class="tab-info-item">
-            {{ store.generatedResult.entityName }} · {{ store.generatedResult.mockData.length }} 条Mock
+            {{ store.generatedResult.entityName }} · {{ store.generatedFiles.length }} 文件
           </span>
           <span v-if="store.generatedResult.matchedComponents?.length" class="tab-info-item tab-info-item--comp">
-            {{ store.generatedResult.matchedComponents.length }} 个组件
+            {{ store.generatedResult.matchedComponents.length }} 组件匹配
           </span>
         </div>
       </div>
@@ -53,10 +53,9 @@
         />
         <CodePanel
           v-show="store.activeTab === 'code'"
-          :page-code="store.generatedResult?.sfcCode || ''"
-          :api-code="store.generatedResult?.apiCode || ''"
-          :code-tab="store.codeTab"
-          @update:code-tab="store.codeTab = $event"
+          :files="store.generatedFiles"
+          :active-index="store.activeFileIndex"
+          @update:active-file-index="store.activeFileIndex = $event"
         />
       </div>
     </div>

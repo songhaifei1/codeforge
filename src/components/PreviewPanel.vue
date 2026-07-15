@@ -4,6 +4,7 @@
       <span class="preview-title">页面预览</span>
       <div class="preview-actions">
         <span v-if="pageTypeName" class="preview-badge">{{ pageTypeName }}</span>
+        <span v-if="fileCount" class="preview-badge-files">{{ fileCount }} 文件</span>
         <button class="preview-refresh" @click="renderPreview" title="刷新预览">↻</button>
       </div>
     </div>
@@ -21,7 +22,11 @@
 import { ref, watch, onMounted, onUnmounted, nextTick, createApp, defineComponent } from 'vue'
 import * as VueRuntime from 'vue'
 import { compile } from '@vue/compiler-dom'
-import { allComponents } from '../mock-ui'
+// ant-design-vue 预览组件
+import {
+  Table, Button, Select, Input, Tag, DatePicker,
+  Card, Descriptions, Divider, Row, Col,
+} from 'ant-design-vue'
 import type { GeneratedResult } from '../types'
 
 const props = defineProps<{
@@ -32,11 +37,11 @@ const previewRoot = ref<HTMLElement>()
 let app: ReturnType<typeof createApp> | null = null
 
 const pageTypeName = ref('')
+const fileCount = ref(0)
 
-// 使用 @vue/compiler-dom 编译模板字符串为渲染函数
+// @vue/compiler-dom 编译模板字符串为渲染函数
 function compileTemplate(template: string): (ctx: any, cache: any) => any {
   const { code } = compile(template, { mode: 'function' })
-  // mode:'function' 生成的代码引用 Vue 变量获取运行时辅助函数
   const fn = new Function('Vue', code)
   return fn(VueRuntime)
 }
@@ -53,28 +58,45 @@ function renderPreview() {
     list: '列表页', form: '表单页', detail: '详情页', dashboard: '统计看板',
   }
   pageTypeName.value = typeMap[result.pageType] || ''
+  fileCount.value = result.files?.length || 0
+
+  if (!result.previewTemplate || !result.previewSetup) {
+    if (previewRoot.value) {
+      previewRoot.value.innerHTML = `<div style="padding:20px;color:#666;text-align:center">预览暂不可用</div>`
+    }
+    return
+  }
 
   try {
-    // 编译模板为渲染函数
     const renderFn = compileTemplate(result.previewTemplate)
 
-    // 创建预览组件
     const previewComponent = defineComponent({
       setup: result.previewSetup,
       render() {
         return renderFn(this, [])
-      }
+      },
     })
 
-    // 创建独立 Vue 应用实例用于预览
     const previewApp = createApp(previewComponent)
 
-    // 注册所有企业组件库组件
-    for (const [name, component] of Object.entries(allComponents)) {
-      const kebab = name.replace(/([A-Z])/g, '-$1').toLowerCase().slice(1)
-      previewApp.component(kebab, component as any)
-      previewApp.component(name, component as any)
+    // 注册 ant-design-vue 预览组件（kebab-case + PascalCase）
+    const register = (name: string, comp: any) => {
+      previewApp.component(name, comp)
+      previewApp.component(name.replace(/-([a-z])/g, (_, c) => c.toUpperCase()).replace(/^a/, 'A'), comp)
     }
+    register('a-table', Table)
+    register('a-button', Button)
+    register('a-select', Select)
+    register('a-select-option', Select.Option)
+    register('a-input', Input)
+    register('a-tag', Tag)
+    register('a-date-picker', DatePicker)
+    register('a-card', Card)
+    register('a-descriptions', Descriptions)
+    register('a-descriptions-item', Descriptions.Item)
+    register('a-divider', Divider)
+    register('a-row', Row)
+    register('a-col', Col)
 
     app = previewApp
     app.mount(previewRoot.value)
@@ -123,6 +145,10 @@ onUnmounted(() => {
 .preview-badge {
   font-size: 12px; padding: 2px 8px; border-radius: 4px;
   background: #e6f4ff; color: #4096ff; font-weight: 600;
+}
+.preview-badge-files {
+  font-size: 12px; padding: 2px 8px; border-radius: 4px;
+  background: #f0f5ff; color: #6366f1; font-weight: 600;
 }
 .preview-refresh {
   border: 1px solid #d9d9d9; background: #fff; border-radius: 4px;

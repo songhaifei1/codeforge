@@ -1,563 +1,796 @@
-import { ref, reactive } from 'vue'
-import type { ParsedRequirement, GeneratedResult, ParsedField, ParsedAction } from '../types'
-import { generateMockData, generateDetailMockData } from './mockDataGenerator'
-import { matchComponents } from '../knowledge/componentKnowledge'
+import { ref, reactive, computed } from 'vue'
+import type {
+  ParsedRequirement, GeneratedResult, GeneratedFile,
+  ParsedField, ParsedFilter, ParsedAction,
+} from '../types'
+import { generateMockData } from './mockDataGenerator'
+import {
+  matchComponents, getRequiredHooks, getRequiredComponents,
+  hookKnowledgeBase, utilityKnowledgeBase,
+  type ComponentKnowledge,
+} from '../knowledge/componentKnowledge'
 
-// ===== 辅助函数 =====
+// ===== 工具函数 =====
 
-function getTagType(value: string): string {
-  if (/运行中|正常|已完成|已关闭|成功|启用/.test(value)) return 'success'
-  if (/故障|异常|错误|失败|停用|严重/.test(value)) return 'danger'
-  if (/维护中|待处理|处理中|警告|重要/.test(value)) return 'warning'
-  return 'info'
+/** 生成唯一组件名 */
+function toComponentName(name: string): string {
+  return name.charAt(0).toUpperCase() + name.slice(1).replace(/[-_](.)/g, (_, c) => c.toUpperCase())
 }
 
-function getImportList(parsed: ParsedRequirement): string {
-  const components = new Set<string>(['CfCard'])
-  if (parsed.pageType === 'list') {
-    components.add('CfTable')
-    components.add('CfPagination')
-    components.add('CfButton')
-    if (parsed.fields.some(f => f.type === 'tag')) components.add('CfTag')
-    if (parsed.filters.some(f => f.type === 'input')) components.add('CfInput')
-    if (parsed.filters.some(f => f.type === 'select')) components.add('CfSelect')
-    if (parsed.filters.some(f => f.type === 'datepicker')) components.add('CfDatePicker')
-  } else if (parsed.pageType === 'form') {
-    components.add('CfForm')
-    components.add('CfFormItem')
-    components.add('CfButton')
-    if (parsed.fields.some(f => f.type === 'text' || f.type === 'number')) components.add('CfInput')
-    if (parsed.fields.some(f => f.type === 'select')) components.add('CfSelect')
-    if (parsed.fields.some(f => f.type === 'date')) components.add('CfDatePicker')
-    if (parsed.fields.some(f => f.type === 'textarea')) components.add('CfInput')
-  } else if (parsed.pageType === 'detail') {
-    components.add('CfButton')
-    components.add('CfTag')
-    if (parsed.detailSections?.length) components.add('CfTable')
-  } else if (parsed.pageType === 'dashboard') {
-    components.add('CfTable')
-    if (parsed.fields.some(f => f.type === 'tag')) components.add('CfTag')
-  } else {
-    components.add('CfTag')
+/** 根据推断类型选择搜索表单组件 */
+function inferSearchComponent(f: ParsedFilter): { component: string; componentProps: Record<string, any> } {
+  if (f.type === 'select') {
+    return {
+      component: 'Select',
+      componentProps: {
+        options: (f.options || []).map(o => ({ label: o, value: o })),
+        placeholder: `请选择${f.label}`,
+      },
+    }
   }
-  return Array.from(components).join(', ')
+  if (f.type === 'datepicker') {
+    return {
+      component: 'DatePicker',
+      componentProps: { placeholder: `请选择${f.label}` },
+    }
+  }
+  if (f.type === 'organize') {
+    return {
+      component: 'Organize',
+      componentProps: { placeholder: `请选择${f.label}`, multiple: false },
+    }
+  }
+  // input 默认
+  return {
+    component: 'Input',
+    componentProps: { placeholder: `请输入${f.label}` },
+  }
 }
 
-// ===== 模板生成 =====
+/** 列格式推断 */
+function inferColumnFormat(f: ParsedField): string | undefined {
+  if (f.type === 'date') return 'date|YYYY-MM-DD HH:mm:ss'
+  return undefined
+}
 
-function generateListTemplate(parsed: ParsedRequirement): string {
-  const { fields, filters, actions, pageTitle } = parsed
-  const indent = '    '
-  let html = `<div class="page-container">\n`
-  html += `  <cf-card title="${pageTitle}">\n`
+// ===== 列配置生成（列表页用） =====
 
-  // Filter bar
+function generateListColumnsCode(fields: ParsedField[]): string {
+  const cols = fields.map(f => {
+    const width = f.label.length > 4 ? ', width: 180' : f.label.length > 2 ? ', width: 120' : ', width: 100'
+    const format = inferColumnFormat(f) ? `, format: '${inferColumnFormat(f)}'` : ''
+    return `    { title: '${f.label}', dataIndex: '${f.name}'${width}${format} },`
+  })
+  return `const columns: BasicColumn[] = [\n${cols.join('\n')}\n  ]`
+}
+
+// ===== 搜索表单 schemas 生成 =====
+
+function generateSearchSchemas(filters: ParsedFilter[]): string {
+  if (filters.length === 0) return '      schemas: [],'
+  const items = filters.map(f => {
+    const comp = inferSearchComponent(f)
+    const props = JSON.stringify(comp.componentProps, null, 2)
+      .replace(/\n/g, '\n          ')
+      .replace(/\s+$/, '')
+    return `        {
+          field: '${f.field}',
+          label: '${f.label}',
+          component: '${comp.component}',
+          componentProps: ${props},
+        }`
+  })
+  return `      schemas: [\n${items.join(',\n')}\n      ],`
+}
+
+// ===== 表格列 slot 模板（sort/status等特殊列） =====
+
+function generateColumnSlots(fields: ParsedField[]): string {
+  const tagFields = fields.filter(f => f.type === 'tag')
+  if (tagFields.length === 0) return ''
+
+  return tagFields.map(f => `
+            <template v-if="column.dataIndex === '${f.name}'">
+              <a-tag :color="getTagColor(record.${f.name})">{{ record.${f.name} }}</a-tag>
+            </template>`
+  ).join('')
+}
+
+// ===== 行操作按钮 =====
+
+function generateRowActions(actions: ParsedAction[]): string {
+  const rowActions = actions.filter(a => a.isRowAction !== false && a.action !== 'handleAdd' && a.action !== 'handleExport')
+  if (rowActions.length === 0) {
+    // 默认：编辑 + 删除 + 查看
+    return `    return [
+      { label: '编辑', onClick: () => addOrUpdateHandle(record) },
+      { label: '删除', color: 'error', modelConfirm: { title: '确认删除', content: '是否确认删除该数据？', onOk: () => handleDelete(record.id) } },
+      { label: '详情', onClick: () => checkDetail(record) },
+    ]`
+  }
+
+  const items = rowActions.map(a => {
+    if (a.action === 'handleEdit') {
+      return `      { label: '${a.label}', onClick: () => addOrUpdateHandle(record) }`
+    }
+    if (a.action === 'handleDelete') {
+      return `      { label: '${a.label}', color: 'error', modelConfirm: { title: '确认删除', content: '是否确认删除该数据？', onOk: () => handleDelete(record.id) } }`
+    }
+    if (a.action === 'handleView') {
+      return `      { label: '${a.label}', onClick: () => checkDetail(record) }`
+    }
+    return `      { label: '${a.label}', onClick: () => ${a.action}(record) }`
+  })
+
+  return `    return [\n${items.join(',\n')}\n    ]`
+}
+
+// ===== 操作按钮区（表格上方） =====
+
+function generateTableActions(actions: ParsedAction[], entityName: string): string {
+  const parts: string[] = []
+  const hasAdd = actions.some(a => a.action === 'handleAdd')
+  const hasDelete = actions.some(a => a.action === 'handleDelete')
+  const hasExport = actions.some(a => a.action === 'handleExport')
+
+  if (hasAdd) {
+    parts.push(`            <a-button type="primary" preIcon="icon-ym icon-ym-btn-add" @click="addOrUpdateHandle()">{{ t('common.addText') }}</a-button>`)
+  }
+  if (hasDelete) {
+    parts.push(`            <a-button type="error" preIcon="icon-ym icon-ym-delete" @click="handleBatchDelete" v-if="!isDetail">{{ t('common.delText') }}</a-button>`)
+  }
+  if (hasExport) {
+    parts.push(`            <a-button preIcon="icon-ym icon-ym-export" @click="handleExport">导出</a-button>`)
+  }
+
+  if (parts.length === 0) {
+    parts.push(`            <a-button type="primary" preIcon="icon-ym icon-ym-btn-add" @click="addOrUpdateHandle()">{{ t('common.addText') }}</a-button>`)
+    parts.push(`            <a-button type="error" preIcon="icon-ym icon-ym-delete" @click="handleBatchDelete">{{ t('common.delText') }}</a-button>`)
+  }
+
+  return parts.join('\n')
+}
+
+// ===== 生成 index.vue =====
+
+function generateIndexVue(parsed: ParsedRequirement): string {
+  const { fields, filters, actions, pageTitle, entityName } = parsed
+  const hasFilters = filters.length > 0
+  const componentName = toComponentName(entityName)
+  const isDetail = parsed.pageType === 'detail'
+
+  if (isDetail) {
+    return generateDetailIndexVue(parsed)
+  }
+
+  let code = `<template>
+  <div class="jnpf-content-wrapper">
+    <div class="jnpf-content-wrapper-center">
+      <div class="jnpf-content-wrapper-content">
+        <BasicTable @register="registerTable">
+          <template #tableTitle>
+${generateTableActions(actions, entityName)}
+          </template>
+          <template #bodyCell="{ column, record }">${generateColumnSlots(fields)}
+            <template v-if="column.key === 'action'">
+              <TableAction :actions="getTableActions(record)" />
+            </template>
+          </template>
+        </BasicTable>
+      </div>
+    </div>
+    <dialogEdit @register="registerForm" @reload="reload" @submit="handleSubmit" />
+  </div>
+</template>
+
+<script lang="ts" setup>
+  import { ref, onMounted } from 'vue';
+  import { BasicTable, useTable, TableAction } from '@/components/Table';
+  import type { BasicColumn, ActionItem } from '@/components/Table';
+  import { useI18n } from '@/hooks/web/useI18n';
+  import { useMessage } from '@/hooks/web/useMessage';
+  import { useModal } from '@/components/Modal';
+  import { Modal } from 'ant-design-vue';
+  import api from './api/index';
+  import dialogEdit from './Form.vue';
+
+  defineOptions({ name: '${componentName}' });
+
+  const { t } = useI18n();
+  const { createMessage } = useMessage();
+
+  // ===== 表格列定义 =====
+${generateListColumnsCode(fields)}
+
+  // ===== 弹窗注册 =====
+  const [registerForm, { openModal: openFormModal, closeModal }] = useModal();
+
+  // ===== 表格注册 =====
+  const [registerTable, { reload, getForm, getSelectRowKeys }] = useTable({
+    api: api.queryMain,
+    columns,
+    useSearchForm: ${hasFilters},
+    formConfig: {
+${generateSearchSchemas(filters)}
+    },
+    actionColumn: {
+      width: 160,
+      title: '操作',
+      dataIndex: 'action',
+    },
+    rowSelection: { type: 'checkbox' },
+    clickToRowSelect: false,
+    clearSelectOnPageChange: true,
+  });
+
+  // ===== 行操作按钮 =====
+  function getTableActions(record: any): ActionItem[] {
+${generateRowActions(actions)}
+  }
+
+  // ===== 新增/编辑 =====
+  function addOrUpdateHandle(row: any = {}) {
+    openFormModal(true, { ...row });
+  }
+
+  // ===== 查看详情 =====
+  function checkDetail(row: any) {
+    openFormModal(true, { ...row, type: 'detail' });
+  }
+
+  // ===== 删除 =====
+  function handleDelete(id: string) {
+    api.deleteMain([id]).then((res: any) => {
+      if (res.code === 200) {
+        createMessage.success(res.msg || '删除成功');
+        reload();
+      } else {
+        createMessage.error(res.msg || '删除失败');
+      }
+    });
+  }
+
+  // ===== 批量删除 =====
+  function handleBatchDelete() {
+    const selectedKeys = getSelectRowKeys();
+    if (!selectedKeys.length) {
+      createMessage.error(t('common.selectDataTip'));
+      return;
+    }
+    Modal.confirm({
+      title: '确认删除',
+      content: '是否确认删除选中的数据？',
+      onOk: () => {
+        api.deleteMains(selectedKeys.join(',')).then((res: any) => {
+          if (res.code === 200) {
+            createMessage.success(res.msg || '删除成功');
+            reload();
+          } else {
+            createMessage.error(res.msg || '删除失败');
+          }
+        });
+      },
+    });
+  }
+
+  // ===== 提交回调 =====
+  async function handleSubmit(valid: any) {
+    try {
+      if (valid.id) {
+        const res = await api.editMain(valid);
+        if (res.code === 200) {
+          createMessage.success('编辑成功');
+          closeModal();
+          reload();
+        } else {
+          createMessage.error(res.msg || '编辑失败');
+        }
+      } else {
+        const res = await api.saveMain(valid);
+        if (res.code === 200) {
+          createMessage.success('新增成功');
+          closeModal();
+          reload();
+        } else {
+          createMessage.error(res.msg || '新增失败');
+        }
+      }
+    } catch (error) {
+      console.error('保存失败:', error);
+    }
+  }
+
+  // ===== 导出 =====
+${actions.some(a => a.action === 'handleExport') ? `  function handleExport() {\n    getForm().then((form: any) => {\n      // TODO: 调用导出接口\n      createMessage.info('导出中...');\n    });\n  }` : ''}
+
+  onMounted(() => {
+    // 初始化
+  });
+</script>
+
+<style lang="less" scoped>
+</style>
+`
+
+  return code
+}
+
+// ===== 详情页 index.vue =====
+
+function generateDetailIndexVue(parsed: ParsedRequirement): string {
+  const { fields, pageTitle, entityName, detailSections } = parsed
+  const componentName = toComponentName(entityName)
+
+  return `<template>
+  <div class="jnpf-content-wrapper">
+    <div class="jnpf-content-wrapper-center">
+      <div class="jnpf-content-wrapper-content">
+        <a-card :title="pageTitle">
+          <a-descriptions :column="3" bordered>
+${fields.map(f => {
+    if (f.type === 'tag') {
+      return `            <a-descriptions-item label="${f.label}">
+              <a-tag :color="getTagColor(detailData.${f.name})">{{ detailData.${f.name} }}</a-tag>
+            </a-descriptions-item>`
+    }
+    return `            <a-descriptions-item label="${f.label}">{{ detailData.${f.name} }}</a-descriptions-item>`
+  }).join('\n')}
+          </a-descriptions>
+${detailSections?.map(sec => `
+          <a-divider>${sec.label}</a-divider>
+          <a-table :dataSource="detailData.${sec.name}" :columns="detailSectionColumns" :pagination="false" bordered size="small" />`).join('') || ''}
+          <div style="margin-top: 24px; text-align: center">
+            <a-button @click="handleBack">返回</a-button>
+          </div>
+        </a-card>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+  import { ref, onMounted } from 'vue';
+  import { useI18n } from '@/hooks/web/useI18n';
+  import api from './api/index';
+
+  defineOptions({ name: '${componentName}Detail' });
+
+  const { t } = useI18n();
+  const pageTitle = ref('${pageTitle}');
+
+  const detailData = ref<Record<string, any>>({});
+${detailSections?.length ? `
+  const detailSectionColumns = ref([
+${detailSections[0]?.columns.map(c => `    { title: '${c.label}', dataIndex: '${c.name}', key: '${c.name}' }`).join(',\n') || '    // auto-generated'}
+  ]);` : ''}
+
+  async function fetchDetail(id: string) {
+    try {
+      const res = await api.getMainDetail(id);
+      if (res.code === 200) {
+        detailData.value = res.data;
+      }
+    } catch (error) {
+      console.error('获取详情失败:', error);
+    }
+  }
+
+  function handleBack() {
+    // router.back() or router.push(...)
+    window.history.back();
+  }
+
+  function getTagColor(value: string): string {
+    if (/运行中|正常|已完成|成功|通过/.test(value)) return 'green';
+    if (/故障|异常|错误|失败|未通过/.test(value)) return 'red';
+    if (/维护中|待处理|处理中|警告/.test(value)) return 'orange';
+    return 'blue';
+  }
+
+  onMounted(() => {
+    // 从路由参数获取 id
+    // fetchDetail(route.params.id as string);
+  });
+</script>
+
+<style lang="less" scoped>
+</style>
+`
+}
+
+// ===== 生成 api/index.ts =====
+
+function generateApiFile(parsed: ParsedRequirement): string {
+  const { entityName, apiPrefix, apiResource } = parsed
+  const prefix = apiPrefix || '/api'
+  const resource = apiResource || `/${entityName.toLowerCase()}`
+  const fullPath = prefix.endsWith('/') ? prefix + resource.replace(/^\//, '') : `${prefix}${resource}`
+
+  return `import { defHttp } from '@/utils/http/axios';
+
+const PREFIX = '${fullPath}';
+
+export default {
+  /** 分页查询 */
+  queryMain(data: any) {
+    return defHttp.get({ url: PREFIX, data });
+  },
+
+  /** 新增 */
+  saveMain(data: any) {
+    return defHttp.post({ url: PREFIX, data });
+  },
+
+  /** 编辑 */
+  editMain(data: any) {
+    return defHttp.put({ url: \`\${PREFIX}/\${data.id}\`, data });
+  },
+
+  /** 获取详情 */
+  getMainDetail(id: string) {
+    return defHttp.get({ url: \`\${PREFIX}/\${id}\` });
+  },
+
+  /** 删除 */
+  deleteMain(id: string[]) {
+    return defHttp.delete({ url: \`\${PREFIX}/\${id.join(',')}\` });
+  },
+
+  /** 批量删除 */
+  deleteMains(ids: string) {
+    return defHttp.delete({ url: \`\${PREFIX}/batch/\${ids}\` });
+  },
+};
+`
+}
+
+// ===== 生成 Form.vue（新增/编辑弹窗） =====
+
+function generateFormVue(parsed: ParsedRequirement): string {
+  const { fields, entityName } = parsed
+  const componentName = toComponentName(entityName)
+
+  return `<template>
+  <BasicModal v-bind="$attrs" @register="registerModal" destroyOnClose width="60%" :title="title" @ok="handleSubmit">
+    <a-form :model="formData" ref="formRef" :labelCol="{ span: 6 }" autocomplete="off">
+${fields.map(f => {
+    const rules = f.required ? ` :rules="[{ required: true, message: '请输入${f.label}', trigger: 'change' }]"` : ''
+    let input: string
+    if (f.type === 'select') {
+      input = `        <a-select v-model:value="formData.${f.name}" placeholder="请选择${f.label}" :disabled="isDetail" :options="${f.name}Options" style="width: 100%" />`
+    } else if (f.type === 'date') {
+      input = `        <a-date-picker v-model:value="formData.${f.name}" placeholder="请选择${f.label}" :disabled="isDetail" style="width: 100%" />`
+    } else if (f.type === 'textarea') {
+      input = `        <a-textarea v-model:value="formData.${f.name}" placeholder="请输入${f.label}" :disabled="isDetail" :rows="4" />`
+    } else if (f.type === 'tag') {
+      input = `        <a-input v-model:value="formData.${f.name}" placeholder="请输入${f.label}" :disabled="isDetail" />`
+    } else {
+      input = `        <a-input v-model:value="formData.${f.name}" placeholder="请输入${f.label}" :disabled="isDetail" />`
+    }
+    return `      <a-form-item label="${f.label}" name="${f.name}"${rules}>\n${input}\n      </a-form-item>`
+  }).join('\n')}
+    </a-form>
+  </BasicModal>
+</template>
+
+<script lang="ts" setup>
+  import { reactive, ref } from 'vue';
+  import { BasicModal, useModalInner } from '@/components/Modal/index';
+  import { useMessage } from '@/hooks/web/useMessage';
+  import api from './api/index';
+
+  defineOptions({ name: '${componentName}Form' });
+
+  const emit = defineEmits(['submit', 'reload']);
+
+  const formRef = ref();
+  const title = ref('新增${entityName}');
+  const isDetail = ref(false);
+  const formData = reactive<Record<string, any>>({
+${fields.map(f => `    ${f.name}: ${f.type === 'number' ? '0' : "''"},`).join('\n')}
+  });
+
+${fields.filter(f => f.type === 'select').map(f =>
+    `  const ${f.name}Options = [\n${(f.options || ['选项A', '选项B']).map(o => `    { label: '${o}', value: '${o}' }`).join(',\n')}\n  ];`
+  ).join('\n\n')}
+
+  const [registerModal, { closeModal }] = useModalInner((data: any) => {
+    if (data?.id) {
+      if (data.type === 'detail') {
+        title.value = '${entityName}详情';
+        isDetail.value = true;
+      } else {
+        title.value = '编辑${entityName}';
+        isDetail.value = false;
+      }
+      Object.assign(formData, data);
+    } else {
+      title.value = '新增${entityName}';
+      isDetail.value = false;
+${fields.map(f => `      formData.${f.name} = ${f.type === 'number' ? '0' : "''"};`).join('\n')}
+    }
+  });
+
+  async function handleSubmit() {
+    if (isDetail.value) { closeModal(); return; }
+    emit('submit', { ...formData });
+  }
+</script>
+
+<style lang="less" scoped>
+</style>
+`
+}
+
+// ===== 预览版本（使用 ant-design-vue 直接渲染） =====
+
+function generatePreviewTemplate(parsed: ParsedRequirement): string {
+  const { fields, filters, actions, pageTitle, entityName } = parsed
+  const entityLabel = entityName
+
+  if (parsed.pageType === 'detail') {
+    return generatePreviewDetailTemplate(parsed)
+  }
+
+  let html = `<div style="padding:24px;background:#f5f5f5;min-height:100vh;font-family:sans-serif">
+  <div style="background:#fff;border-radius:8px;padding:24px">
+    <h2 style="margin:0 0 20px;font-size:18px;color:#1a1a2e">${pageTitle}</h2>`
+
+  // Search filters
   if (filters.length > 0) {
-    html += `${indent}<div class="filter-bar">\n`
+    html += `
+    <div style="display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap;align-items:center">`
     for (const f of filters) {
       if (f.type === 'select') {
-        html += `${indent}  <cf-select v-model="filterForm.${f.field}" :options="${f.field}Options" placeholder="${f.label}" />\n`
+        html += `
+      <a-select v-model:value="filterForm.${f.field}" placeholder="${f.label}" style="width:160px">
+${(f.options || ['全部']).map(o => `        <a-select-option value="${o}">${o}</a-select-option>`).join('\n')}
+      </a-select>`
       } else if (f.type === 'datepicker') {
-        html += `${indent}  <cf-datepicker v-model="filterForm.${f.field}" placeholder="${f.label}" />\n`
+        html += `
+      <a-date-picker v-model:value="filterForm.${f.field}" placeholder="${f.label}" style="width:180px" />`
       } else {
-        html += `${indent}  <cf-input v-model="filterForm.${f.field}" placeholder="请输入${f.label}" />\n`
+        html += `
+      <a-input v-model:value="filterForm.${f.field}" placeholder="请输入${f.label}" style="width:180px" />`
       }
     }
-    html += `${indent}  <cf-button type="primary" @click="handleSearch">查询</cf-button>\n`
-    html += `${indent}  <cf-button @click="handleReset">重置</cf-button>\n`
-    html += `${indent}</div>\n`
+    html += `
+      <a-button type="primary" @click="handleSearch">查询</a-button>
+      <a-button @click="handleReset">重置</a-button>
+    </div>`
   }
 
-  // Action bar (top-level actions like "新增", "导出")
-  const topActions = actions.filter(a => a.action === 'handleAdd' || a.action === 'handleExport')
-  if (topActions.length > 0) {
-    html += `${indent}<div class="action-bar">\n`
-    for (const a of topActions) {
-      html += `${indent}  <cf-button type="${a.variant}" @click="${a.action.trim()}">${a.label}</cf-button>\n`
+  // Action buttons
+  const tableTopActions = actions.filter(a => a.action === 'handleAdd' || a.action === 'handleExport')
+  if (tableTopActions.length > 0) {
+    html += `
+    <div style="margin-bottom:16px;display:flex;gap:8px">`
+    for (const a of tableTopActions) {
+      const variant = a.variant === 'danger' ? 'danger' : a.variant === 'primary' ? 'primary' : 'default'
+      html += `
+      <a-button type="${variant}" @click="${a.action.trim()}()">${a.label}</a-button>`
     }
-    html += `${indent}</div>\n`
+    if (!tableTopActions.some(a => a.action === 'handleAdd')) {
+      html += `
+      <a-button type="primary" @click="handleAdd()">新增</a-button>`
+    }
+    html += `\n    </div>`
+  } else {
+    html += `
+    <div style="margin-bottom:16px;display:flex;gap:8px">
+      <a-button type="primary" @click="handleAdd()">新增</a-button>
+      <a-button type="danger">批量删除</a-button>
+    </div>`
   }
 
   // Table
-  html += `${indent}<cf-table :data="tableData" :columns="columns">\n`
+  html += `
+    <a-table :dataSource="filteredData" :columns="previewColumns" :pagination="{ current, total, pageSize: 10, showTotal: (t) => \`共 \${t} 条\` }" rowKey="id" bordered size="small" @change="handlePageChange">
+      <template #bodyCell="{ column, record }">`
   for (const f of fields) {
     if (f.type === 'tag') {
-      html += `${indent}  <template #${f.name}="{ row }">\n`
-      html += `${indent}    <cf-tag :type="getTagType(row.${f.name})">{{ row.${f.name} }}</cf-tag>\n`
-      html += `${indent}  </template>\n`
+      html += `
+        <template v-if="column.dataIndex === '${f.name}'">
+          <a-tag :color="getTagColor(record.${f.name})">{{ record.${f.name} }}</a-tag>
+        </template>`
     }
   }
-  // Row action column
-  const rowActions = actions.filter(a => a.action !== 'handleAdd' && a.action !== 'handleExport')
-  if (rowActions.length > 0) {
-    html += `${indent}  <template #action="{ row, index }">\n`
-    for (const a of rowActions) {
-      html += `${indent}    <cf-button type="${a.variant}" @click="${a.action.trim()}(row)">${a.label}</cf-button>\n`
+  const rowActionsForPreview = actions.filter(a => a.action !== 'handleAdd' && a.action !== 'handleExport')
+  if (rowActionsForPreview.length > 0) {
+    html += `
+        <template v-if="column.key === 'action'">
+          <span style="display:flex;gap:8px">`
+    for (const a of rowActionsForPreview) {
+      html += `
+            <a @click="${a.action.trim()}(record)">${a.label}</a>`
     }
-    html += `${indent}  </template>\n`
+    html += `\n          </span>\n        </template>`
+  } else {
+    html += `
+        <template v-if="column.key === 'action'">
+          <span style="display:flex;gap:8px">
+            <a @click="handleEdit(record)">编辑</a>
+            <a style="color:#ff4d4f" @click="handleDelete(record)">删除</a>
+          </span>
+        </template>`
   }
-  html += `${indent}</cf-table>\n`
+  html += `
+      </template>
+    </a-table>
+  </div>
+</div>`
 
-  // Pagination
-  html += `${indent}<cf-pagination :total="total" v-model:current="currentPage" />\n`
-
-  html += `  </cf-card>\n</div>`
   return html
 }
 
-function generateFormTemplate(parsed: ParsedRequirement): string {
-  const { fields, pageTitle } = parsed
-  let html = `<div class="page-container">\n`
-  html += `  <cf-card title="${pageTitle}">\n`
-  html += `    <cf-form :model="formData">\n`
-  for (const f of fields) {
-    html += `      <cf-form-item label="${f.label}">\n`
-    if (f.type === 'select') {
-      html += `        <cf-select v-model="formData.${f.name}" :options="${f.name}Options" placeholder="请选择${f.label}" />\n`
-    } else if (f.type === 'date') {
-      html += `        <cf-datepicker v-model="formData.${f.name}" placeholder="请选择${f.label}" />\n`
-    } else if (f.type === 'textarea') {
-      html += `        <cf-input v-model="formData.${f.name}" placeholder="请输入${f.label}" />\n`
-    } else {
-      html += `        <cf-input v-model="formData.${f.name}" placeholder="请输入${f.label}" />\n`
-    }
-    html += `      </cf-form-item>\n`
-  }
-  html += `      <cf-form-item>\n`
-  html += `        <cf-button type="primary" @click="handleSubmit">提交</cf-button>\n`
-  html += `        <cf-button @click="handleReset">重置</cf-button>\n`
-  html += `      </cf-form-item>\n`
-  html += `    </cf-form>\n`
-  html += `  </cf-card>\n</div>`
-  return html
-}
-
-function generateDetailTemplate(parsed: ParsedRequirement): string {
+function generatePreviewDetailTemplate(parsed: ParsedRequirement): string {
   const { fields, pageTitle, detailSections } = parsed
-  let html = `<div class="page-container">\n`
-  html += `  <cf-card title="${pageTitle}">\n`
-  html += `    <div class="detail-list">\n`
+
+  let html = `<div style="padding:24px;background:#f5f5f5;min-height:100vh;font-family:sans-serif">
+  <div style="background:#fff;border-radius:8px;padding:24px">
+    <h2 style="margin:0 0 20px;font-size:18px;color:#1a1a2e">${pageTitle}</h2>
+    <div style="display:flex;flex-wrap:wrap;gap:16px 32px">`
   for (const f of fields) {
-    html += `      <div class="detail-item">\n`
-    html += `        <span class="detail-label">${f.label}：</span>\n`
-    if (f.type === 'tag') {
-      html += `        <cf-tag :type="getTagType(detailData.${f.name})">{{ detailData.${f.name} }}</cf-tag>\n`
-    } else {
-      html += `        <span class="detail-value">{{ detailData.${f.name} }}</span>\n`
-    }
-    html += `      </div>\n`
+    html += `
+      <div style="min-width:200px">
+        <span style="color:#666;font-size:13px">${f.label}：</span>
+        <template v-if="${f.type === 'tag'}">
+          <a-tag :color="getTagColor(detailData.${f.name})">{{ detailData.${f.name} }}</a-tag>
+        </template>
+        <template v-else>
+          <span>{{ detailData.${f.name} }}</span>
+        </template>
+      </div>`
   }
-  html += `    </div>\n`
+  html += `
+    </div>`
 
-  if (detailSections && detailSections.length > 0) {
-    for (const section of detailSections) {
-      html += `    <div class="detail-section">\n`
-      html += `      <div class="section-title">${section.label}</div>\n`
-      html += `      <cf-table :data="detailData.${section.name} || []" :columns="sectionColumns['${section.name}']" />\n`
-      html += `    </div>\n`
+  if (detailSections?.length) {
+    for (const sec of detailSections) {
+      html += `
+    <div style="margin-top:24px">
+      <h3 style="font-size:15px;color:#333;margin-bottom:12px">${sec.label}</h3>
+      <a-table :dataSource="detailData.${sec.name} || []" :columns="previewSectionColumns" :pagination="false" bordered size="small" rowKey="id" />
+    </div>`
     }
   }
 
-  html += `    <div class="detail-footer">\n`
-  html += `      <cf-button @click="handleBack">返回</cf-button>\n`
-  html += `    </div>\n`
-  html += `  </cf-card>\n</div>`
+  html += `
+    <div style="margin-top:24px;text-align:center">
+      <a-button @click="handleBack">返回</a-button>
+    </div>
+  </div>
+</div>`
   return html
 }
 
-function generateDashboardTemplate(parsed: ParsedRequirement): string {
-  const { fields, pageTitle } = parsed
-  const indent = '    '
-  let html = `<div class="page-container">\n`
-  html += `  <cf-card title="${pageTitle}">\n`
-  html += `${indent}<div class="stat-grid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px">\n`
-  html += `${indent}  <div v-for="item in statCards" :key="item.key" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px">\n`
-  html += `${indent}    <div style="font-size:13px;color:#64748b;margin-bottom:8px">{{ item.label }}</div>\n`
-  html += `${indent}    <div style="font-size:28px;font-weight:700;color:#1e293b">{{ item.value }}</div>\n`
-  html += `${indent}    <div :style="{ fontSize: '12px', marginTop: '6px', color: item.trend === 'up' ? '#10b981' : '#ef4444' }">{{ item.trendText }}</div>\n`
-  html += `${indent}  </div>\n`
-  html += `${indent}</div>\n`
-  html += `${indent}<div style="font-size:15px;font-weight:600;color:#334155;margin-bottom:12px">近期数据</div>\n`
-  html += `${indent}<cf-table :data="tableData" :columns="columns">\n`
-  for (const f of fields) {
-    if (f.type === 'tag') {
-      html += `${indent}  <template #${f.name}="{ row }">\n`
-      html += `${indent}    <cf-tag :type="getTagType(row.${f.name})">{{ row.${f.name} }}</cf-tag>\n`
-      html += `${indent}  </template>\n`
-    }
-  }
-  html += `${indent}</cf-table>\n`
-  html += `  </cf-card>\n</div>`
-  return html
-}
+// ===== 预览 setup 数据 =====
 
-function generateTemplate(parsed: ParsedRequirement): string {
-  switch (parsed.pageType) {
-    case 'form': return generateFormTemplate(parsed)
-    case 'detail': return generateDetailTemplate(parsed)
-    case 'dashboard': return generateDashboardTemplate(parsed)
-    default: return generateListTemplate(parsed)
-  }
-}
-
-// ===== Preview Setup 函数 =====
-
-function createListSetup(parsed: ParsedRequirement, mockData: any[]) {
+function createListPreviewSetup(parsed: ParsedRequirement, mockData: any[]) {
   const { fields, filters, actions } = parsed
   return () => {
-    const tableData = ref(mockData)
-    const currentPage = ref(1)
+    const allData = ref(mockData)
+    const current = ref(1)
     const total = ref(mockData.length)
 
-    const columns: Array<{
-      prop: string
-      label: string
-      width?: string
-      align?: 'left' | 'center' | 'right'
-    }> = fields.map(f => ({
-      prop: f.name,
-      label: f.label,
-      width: f.type === 'date' ? '180px' : f.type === 'textarea' ? '250px' : undefined,
-      align: 'left' as const,
-    }))
+    const previewColumns = computed(() => {
+      const cols = fields.map(f => ({
+        title: f.label,
+        dataIndex: f.name,
+        key: f.name,
+        width: f.type === 'date' ? 180 : f.label.length > 4 ? 150 : undefined,
+      }))
+      cols.push({ title: '操作', dataIndex: 'action', key: 'action', width: 160 })
+      return cols
+    })
 
-    const rowActions = actions.filter(a => a.action !== 'handleAdd' && a.action !== 'handleExport')
-    if (rowActions.length > 0) {
-      columns.push({ prop: 'action', label: '操作', width: `${rowActions.length * 70 + 20}px`, align: 'center' as const })
-    }
-
-    const filterForm = reactive<Record<string, string>>({})
-    const optionKeys: Record<string, { label: string; value: string }[]> = {}
+    const filterForm = reactive<Record<string, any>>({})
     for (const f of filters) {
       filterForm[f.field] = ''
-      if (f.type === 'select') {
-        optionKeys[`${f.field}Options`] = (f.options || []).map(o => ({ label: o, value: o }))
-      }
     }
 
-    const handleSearch = () => { console.log('搜索', { ...filterForm }) }
-    const handleReset = () => { Object.keys(filterForm).forEach(k => { filterForm[k] = '' }) }
+    const filteredData = computed(() => {
+      let data = [...allData.value]
+      for (const f of filters) {
+        if (filterForm[f.field]) {
+          data = data.filter(d => {
+            const val = d[f.field]
+            return val && String(val).includes(String(filterForm[f.field]))
+          })
+        }
+      }
+      total.value = data.length
+      return data
+    })
+
+    const handleSearch = () => { current.value = 1 }
+    const handleReset = () => { Object.keys(filterForm).forEach(k => filterForm[k] = ''); current.value = 1 }
     const handleAdd = () => { alert('点击了新增按钮') }
-    const handleEdit = (row: any) => { alert(`编辑：${row.id || row.name || JSON.stringify(row)}`) }
-    const handleDelete = (row: any) => { alert(`删除：${row.id || row.name || JSON.stringify(row)}`) }
-    const handleView = (row: any) => { alert(`查看详情：${row.id || row.name || JSON.stringify(row)}`) }
+    const handleEdit = (r: any) => { alert(`编辑：${JSON.stringify(r, null, 2).slice(0, 200)}`) }
+    const handleDelete = (r: any) => { alert(`删除：${r.name || r.id}`) }
+    const handleView = (r: any) => { alert(`查看详情：${r.name || r.id}`) }
     const handleExport = () => { alert('导出数据') }
-    const handleClose = (row: any) => { alert(`关闭：${row.id || row.name}`) }
+    const handlePageChange = (p: any) => { current.value = p.current || p }
+    const getTagColor = (v: string) => {
+      if (/运行中|正常|已完成|成功|通过/.test(v)) return 'green'
+      if (/故障|异常|错误|失败|未通过/.test(v)) return 'red'
+      if (/维护中|待处理|处理中|警告/.test(v)) return 'orange'
+      return 'blue'
+    }
 
     return {
-      tableData, columns, currentPage, total, filterForm,
-      ...optionKeys,
+      filteredData, previewColumns, current, total, filterForm,
       handleSearch, handleReset, handleAdd, handleEdit,
-      handleDelete, handleView, handleExport, handleClose,
-      getTagType,
+      handleDelete, handleView, handleExport, handlePageChange, getTagColor,
     }
   }
 }
 
-function createFormSetup(parsed: ParsedRequirement, mockData: any[]) {
-  const { fields } = parsed
-  return () => {
-    const formData = reactive<Record<string, any>>({})
-    const optionKeys: Record<string, { label: string; value: string }[]> = {}
-    for (const f of fields) {
-      formData[f.name] = f.type === 'select' ? '' : f.type === 'number' ? 0 : ''
-      if (f.type === 'select') {
-        optionKeys[`${f.name}Options`] = (f.options || []).map(o => ({ label: o, value: o }))
-      }
-    }
-
-    const handleSubmit = () => { alert('提交成功！\n' + JSON.stringify(formData, null, 2)) }
-    const handleReset = () => {
-      for (const f of fields) {
-        formData[f.name] = f.type === 'select' ? '' : f.type === 'number' ? 0 : ''
-      }
-    }
-
-    return { formData, ...optionKeys, handleSubmit, handleReset }
-  }
-}
-
-function createDetailSetup(parsed: ParsedRequirement, mockData: any[]) {
+function createDetailPreviewSetup(parsed: ParsedRequirement, mockData: any[]) {
   const { detailSections } = parsed
   return () => {
     const detailData = ref(mockData[0] || {})
-    const sectionColumns: Record<string, Array<{ prop: string; label: string; width?: string }>> = {}
-    for (const section of detailSections || []) {
-      sectionColumns[section.name] = section.columns.map(f => ({
-        prop: f.name,
-        label: f.label,
-        width: f.type === 'date' ? '180px' : undefined,
+    const previewSectionColumns = computed(() => {
+      if (!detailSections?.length) return []
+      return detailSections[0].columns.map(c => ({
+        title: c.label,
+        dataIndex: c.name,
+        key: c.name,
       }))
-    }
+    })
     const handleBack = () => { alert('返回上一页') }
-    return { detailData, sectionColumns, handleBack, getTagType }
-  }
-}
-
-function createDashboardSetup(parsed: ParsedRequirement, mockData: any[]) {
-  const { fields, entityName } = parsed
-  return () => {
-    const tableData = ref(mockData)
-    const columns = fields.map(f => ({
-      prop: f.name,
-      label: f.label,
-      width: f.type === 'date' ? '180px' : undefined,
-      align: 'left' as const,
-    }))
-    const statCards = ref([
-      { key: 'total', label: `${entityName}总数`, value: '1,286', trend: 'up', trendText: '↑ 12% 较上周' },
-      { key: 'running', label: '运行中', value: '1,102', trend: 'up', trendText: '↑ 3.2%' },
-      { key: 'fault', label: '故障数', value: '23', trend: 'down', trendText: '↓ 8 台' },
-      { key: 'rate', label: '设备完好率', value: '98.2%', trend: 'up', trendText: '↑ 0.5%' },
-    ])
-    return { tableData, columns, statCards, getTagType }
-  }
-}
-
-function createSetup(parsed: ParsedRequirement, mockData: any[]) {
-  switch (parsed.pageType) {
-    case 'form': return createFormSetup(parsed, mockData)
-    case 'detail': return createDetailSetup(parsed, mockData)
-    case 'dashboard': return createDashboardSetup(parsed, mockData)
-    default: return createListSetup(parsed, mockData)
-  }
-}
-
-// ===== SFC 代码字符串生成 =====
-
-function generateColumnsCode(fields: ParsedField[], rowActions: ParsedAction[]): string {
-  const cols = fields.map(f => {
-    const width = f.type === 'date' ? ', width: \'180px\'' : f.type === 'textarea' ? ', width: \'250px\'' : ''
-    return `    { prop: '${f.name}', label: '${f.label}'${width} }`
-  })
-  if (rowActions.length > 0) {
-    cols.push(`    { prop: 'action', label: '操作', width: '${rowActions.length * 70 + 20}px', align: 'center' }`)
-  }
-  return `const columns = [\n${cols.join(',\n')}\n  ]`
-}
-
-function generateListSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  const { fields, filters, actions, pageTitle } = parsed
-  const imports = getImportList(parsed)
-  const template = generateListTemplate(parsed)
-  const rowActions = actions.filter(a => a.action !== 'handleAdd' && a.action !== 'handleExport')
-  const topActions = actions.filter(a => a.action === 'handleAdd' || a.action === 'handleExport')
-
-  let script = `import { ref, reactive } from 'vue'\n`
-  script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
-  script += `// ===== 数据定义 =====\n`
-  script += `const tableData = ref(${JSON.stringify(mockData, null, 2).replace(/\n/g, '\n')})\n`
-  script += `const currentPage = ref(1)\n`
-  script += `const total = ref(${mockData.length})\n\n`
-  script += `// 表格列定义\n`
-  script += `${generateColumnsCode(fields, rowActions)}\n\n`
-
-  // Filter form
-  if (filters.length > 0) {
-    script += `// 筛选表单\n`
-    script += `const filterForm = reactive({\n`
-    for (const f of filters) {
-      script += `  ${f.field}: '',\n`
+    const getTagColor = (v: string) => {
+      if (/运行中|正常|已完成|成功|通过/.test(v)) return 'green'
+      if (/故障|异常|错误|失败|未通过/.test(v)) return 'red'
+      return 'blue'
     }
-    script += `})\n\n`
-    // Options
-    for (const f of filters) {
-      if (f.type === 'select') {
-        script += `const ${f.field}Options = [\n`
-        for (const opt of f.options || []) {
-          script += `  { label: '${opt}', value: '${opt}' },\n`
-        }
-        script += `]\n\n`
-      }
-    }
-  }
-
-  // Handlers
-  script += `// ===== 事件处理 =====\n`
-  if (filters.length > 0) {
-    script += `function handleSearch() {\n  console.log('搜索', filterForm)\n}\n\n`
-    script += `function handleReset() {\n  Object.keys(filterForm).forEach(k => filterForm[k] = '')\n}\n\n`
-  }
-  for (const a of actions) {
-    const fnName = a.action.trim()
-    if (a.action === 'handleAdd' || a.action === 'handleExport') {
-      script += `function ${fnName}() {\n  console.log('${a.label}')\n}\n\n`
-    } else {
-      script += `function ${fnName}(row: any) {\n  console.log('${a.label}', row)\n}\n\n`
-    }
-  }
-
-  script += `// 标签类型映射\n`
-  script += `function getTagType(value: string) {\n`
-  script += `  if (/运行中|正常|已完成|成功/.test(value)) return 'success'\n`
-  script += `  if (/故障|异常|错误|失败/.test(value)) return 'danger'\n`
-  script += `  if (/维护中|待处理|处理中/.test(value)) return 'warning'\n`
-  script += `  return 'info'\n`
-  script += `}\n`
-
-  let sfc = `<template>\n${template}\n</template>\n\n`
-  sfc += `<script setup lang="ts">\n${script}</script>\n\n`
-  sfc += `<style scoped>\n`
-  sfc += `.page-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }\n`
-  sfc += `.filter-bar { display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }\n`
-  sfc += `.action-bar { margin-bottom: 16px; }\n`
-  sfc += `</style>\n`
-
-  return sfc
-}
-
-function generateFormSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  const { fields, pageTitle } = parsed
-  const imports = getImportList(parsed)
-  const template = generateFormTemplate(parsed)
-
-  let script = `import { ref, reactive } from 'vue'\n`
-  script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
-  script += `// 表单数据\n`
-  script += `const formData = reactive({\n`
-  for (const f of fields) {
-    script += `  ${f.name}: '',\n`
-  }
-  script += `})\n\n`
-
-  for (const f of fields) {
-    if (f.type === 'select') {
-      script += `const ${f.name}Options = [\n`
-      for (const opt of f.options || []) {
-        script += `  { label: '${opt}', value: '${opt}' },\n`
-      }
-      script += `]\n\n`
-    }
-  }
-
-  script += `function handleSubmit() {\n  console.log('提交', formData)\n  alert('提交成功！')\n}\n\n`
-  script += `function handleReset() {\n  Object.keys(formData).forEach(k => formData[k] = '')\n}\n`
-
-  let sfc = `<template>\n${template}\n</template>\n\n`
-  sfc += `<script setup lang="ts">\n${script}</script>\n\n`
-  sfc += `<style scoped>\n`
-  sfc += `.page-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }\n`
-  sfc += `</style>\n`
-
-  return sfc
-}
-
-function generateDetailSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  const imports = getImportList(parsed)
-  const template = generateDetailTemplate(parsed)
-
-  let script = `import { ref } from 'vue'\n`
-  script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
-  script += `const detailData = ref(${JSON.stringify(mockData[0] || {}, null, 2)})\n\n`
-
-  if (parsed.detailSections?.length) {
-    script += `const sectionColumns = {\n`
-    for (const section of parsed.detailSections) {
-      script += `  ${section.name}: [\n`
-      for (const col of section.columns) {
-        const width = col.type === 'date' ? ", width: '180px'" : ''
-        script += `    { prop: '${col.name}', label: '${col.label}'${width} },\n`
-      }
-      script += `  ],\n`
-    }
-    script += `}\n\n`
-  }
-
-  script += `function handleBack() {\n  console.log('返回')\n}\n\n`
-  script += `function getTagType(value: string) {\n`
-  script += `  if (/运行中|正常|已完成|成功|通过/.test(value)) return 'success'\n`
-  script += `  if (/故障|异常|错误|未通过|缺考/.test(value)) return 'danger'\n`
-  script += `  return 'info'\n`
-  script += `}\n`
-
-  let sfc = `<template>\n${template}\n</template>\n\n`
-  sfc += `<script setup lang="ts">\n${script}</script>\n\n`
-  sfc += `<style scoped>\n`
-  sfc += `.page-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }\n`
-  sfc += `.detail-list { display: flex; flex-direction: column; gap: 16px; }\n`
-  sfc += `.detail-item { display: flex; align-items: center; gap: 8px; }\n`
-  sfc += `.detail-label { width: 120px; text-align: right; color: #666; font-size: 14px; }\n`
-  sfc += `.detail-value { color: #333; font-size: 14px; }\n`
-  sfc += `.detail-footer { margin-top: 24px; }\n`
-  sfc += `.detail-section { margin-top: 24px; }\n`
-  sfc += `.section-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 12px; }\n`
-  sfc += `</style>\n`
-
-  return sfc
-}
-
-function generateDashboardSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  const imports = getImportList(parsed)
-  const template = generateDashboardTemplate(parsed)
-  const { fields, entityName } = parsed
-
-  let script = `import { ref } from 'vue'\n`
-  script += `import { ${imports} } from '@codeforge/mock-ui'\n\n`
-  script += `const tableData = ref(${JSON.stringify(mockData, null, 2)})\n\n`
-  script += `const columns = [\n`
-  for (const f of fields) {
-    const width = f.type === 'date' ? ", width: '180px'" : ''
-    script += `  { prop: '${f.name}', label: '${f.label}'${width} },\n`
-  }
-  script += `]\n\n`
-  script += `const statCards = ref([\n`
-  script += `  { key: 'total', label: '${entityName}总数', value: '1,286', trend: 'up', trendText: '↑ 12% 较上周' },\n`
-  script += `  { key: 'running', label: '运行中', value: '1,102', trend: 'up', trendText: '↑ 3.2%' },\n`
-  script += `  { key: 'fault', label: '故障数', value: '23', trend: 'down', trendText: '↓ 8 台' },\n`
-  script += `  { key: 'rate', label: '设备完好率', value: '98.2%', trend: 'up', trendText: '↑ 0.5%' },\n`
-  script += `])\n\n`
-  script += `function getTagType(value: string) {\n`
-  script += `  if (/运行中|正常|已完成|成功/.test(value)) return 'success'\n`
-  script += `  if (/故障|异常|错误|失败/.test(value)) return 'danger'\n`
-  script += `  return 'info'\n`
-  script += `}\n`
-
-  let sfc = `<template>\n${template}\n</template>\n\n`
-  sfc += `<script setup lang="ts">\n${script}</script>\n\n`
-  sfc += `<style scoped>\n`
-  sfc += `.page-container { padding: 20px; background: #f0f2f5; min-height: 100vh; }\n`
-  sfc += `.stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }\n`
-  sfc += `.stat-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; }\n`
-  sfc += `.stat-label { font-size: 13px; color: #64748b; margin-bottom: 8px; }\n`
-  sfc += `.stat-value { font-size: 28px; font-weight: 700; color: #1e293b; }\n`
-  sfc += `.stat-trend { font-size: 12px; margin-top: 6px; }\n`
-  sfc += `.stat-trend.up { color: #10b981; }\n`
-  sfc += `.stat-trend.down { color: #ef4444; }\n`
-  sfc += `.section-title { font-size: 15px; font-weight: 600; color: #334155; margin-bottom: 12px; }\n`
-  sfc += `</style>\n`
-
-  return sfc
-}
-
-function generateSFC(parsed: ParsedRequirement, mockData: any[]): string {
-  switch (parsed.pageType) {
-    case 'form': return generateFormSFC(parsed, mockData)
-    case 'detail': return generateDetailSFC(parsed, mockData)
-    case 'dashboard': return generateDashboardSFC(parsed, mockData)
-    default: return generateListSFC(parsed, mockData)
+    return { detailData, previewSectionColumns, handleBack, getTagColor }
   }
 }
 
 // ===== 主入口 =====
 
 export function generateCode(parsed: ParsedRequirement, options?: { apiCode?: string }): GeneratedResult {
-  const mockData = parsed.pageType === 'detail'
-    ? [generateDetailMockData(parsed)]
-    : generateMockData(parsed.fields, parsed.pageType === 'dashboard' ? 5 : 8)
-  const previewTemplate = generateTemplate(parsed)
-  const previewSetup = createSetup(parsed, mockData)
-  const sfcCode = generateSFC(parsed, mockData)
+  const mockData = generateMockData(parsed.fields, parsed.pageType === 'dashboard' ? 5 : 8)
+
+  // 生成各个文件
+  const files: GeneratedFile[] = []
+
+  const indexVue = generateIndexVue(parsed)
+  files.push({ filename: 'index.vue', language: 'vue', code: indexVue })
+
+  const apiTs = generateApiFile(parsed)
+  files.push({ filename: 'api/index.ts', language: 'typescript', code: apiTs })
+
+  const formVue = generateFormVue(parsed)
+  files.push({ filename: 'Form.vue', language: 'vue', code: formVue })
+
+  // 预览版本
+  const previewTemplate = generatePreviewTemplate(parsed)
+  let previewSetup: () => Record<string, any>
+  if (parsed.pageType === 'detail') {
+    previewSetup = createDetailPreviewSetup(parsed, mockData)
+  } else {
+    previewSetup = createListPreviewSetup(parsed, mockData)
+  }
+
+  // 匹配组件
   const matched = matchComponents(parsed)
+  const matchedHooks = getRequiredHooks(parsed)
+  const matchedComps = getRequiredComponents(parsed)
 
   return {
-    sfcCode,
-    previewTemplate,
-    previewSetup,
+    files,
     pageType: parsed.pageType,
     entityName: parsed.entityName,
     mockData,
     parseResult: parsed,
-    apiCode: options?.apiCode,
-    matchedComponents: matched.map(c => c.name),
+    matchedComponents: [
+      ...matched.map(c => c.displayName),
+      ...matchedHooks.map(h => h.displayName),
+    ],
+    pageTitle: parsed.pageTitle,
+    previewTemplate,
+    previewSetup,
   }
 }

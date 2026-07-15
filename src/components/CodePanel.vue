@@ -1,175 +1,196 @@
 <template>
   <div class="code-panel">
-    <div class="code-toolbar">
-      <div class="code-toolbar-left">
-        <span class="code-title">生成的代码</span>
-        <div v-if="hasApiCode" class="code-subtabs">
-          <button
-            class="code-subtab"
-            :class="{ active: codeTab === 'page' }"
-            @click="$emit('update:codeTab', 'page')"
-          >
-            页面代码
-          </button>
-          <button
-            class="code-subtab"
-            :class="{ active: codeTab === 'api' }"
-            @click="$emit('update:codeTab', 'api')"
-          >
-            API 代码
-          </button>
-        </div>
+    <div class="panel-header">
+      <div class="tabs">
+        <button
+          v-for="(file, index) in files"
+          :key="file.filename"
+          :class="['tab', { active: activeIndex === index }]"
+          @click="$emit('update:activeFileIndex', index)"
+        >
+          <span class="tab-icon">{{ file.filename.includes('api') ? '🔌' : '📄' }}</span>
+          <span class="tab-name">{{ file.filename }}</span>
+          <span class="tab-lang" v-if="file.language === 'vue'">.vue</span>
+          <span class="tab-lang" v-else>.ts</span>
+        </button>
       </div>
-      <div class="code-actions">
-        <span v-if="lineCount" class="code-info">{{ lineCount }} 行</span>
-        <button class="code-copy" @click="copyCode">
-          {{ copied ? '✓ 已复制' : '📋 复制' }}
+      <div class="panel-actions">
+        <span class="file-count">{{ files.length }} 个文件</span>
+        <button class="btn-copy" @click="copyCode" :class="{ copied: copied }">
+          {{ copied ? '✅ 已复制' : '📋 复制代码' }}
         </button>
       </div>
     </div>
-    <div class="code-content">
-      <div v-if="!activeCode" class="code-empty">
-        <div class="empty-icon">📝</div>
-        <p>生成的 Vue3 代码将在这里展示</p>
-      </div>
-      <pre v-else class="code-block"><code v-html="highlightedCode"></code></pre>
+    <div class="code-content" v-if="currentFile">
+      <pre class="code-block"><code>{{ currentFile.code }}</code></pre>
+    </div>
+    <div class="usage-tips" v-if="files.length > 0">
+      <h4>📖 使用说明</h4>
+      <ol>
+        <li>将 <code>index.vue</code> 和 <code>Form.vue</code> 复制到 <code>src/views/对应的模块/</code> 目录</li>
+        <li>将 <code>api/index.ts</code> 复制到 <code>src/views/对应的模块/api/</code> 目录</li>
+        <li>在路由文件 <code>src/router/routes/</code> 中添加页面路由配置</li>
+        <li>启动项目：<code>npm run dev</code></li>
+      </ol>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import hljs from 'highlight.js/lib/core'
-import xml from 'highlight.js/lib/languages/xml'
-import typescript from 'highlight.js/lib/languages/typescript'
-
-hljs.registerLanguage('xml', xml)
-hljs.registerLanguage('typescript', typescript)
+import { computed, ref } from 'vue'
+import type { GeneratedFile } from '../types'
 
 const props = defineProps<{
-  pageCode: string
-  apiCode: string
-  codeTab: 'page' | 'api'
+  files: GeneratedFile[]
+  activeIndex: number
 }>()
 
-defineEmits<{
-  'update:codeTab': ['page' | 'api']
+const emit = defineEmits<{
+  'update:activeFileIndex': [index: number]
 }>()
 
 const copied = ref(false)
 
-const hasApiCode = computed(() => !!props.apiCode)
-
-const activeCode = computed(() => {
-  if (props.codeTab === 'api' && props.apiCode) return props.apiCode
-  return props.pageCode
+const currentFile = computed(() => {
+  return props.files[props.activeIndex] || null
 })
 
-const highlightedCode = computed(() => {
-  if (!activeCode.value) return ''
-  try {
-    const lang = props.codeTab === 'api' ? 'typescript' : 'xml'
-    const result = hljs.highlight(activeCode.value, { language: lang })
-    return result.value
-  } catch {
-    return activeCode.value
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-  }
-})
-
-const lineCount = computed(() => {
-  if (!activeCode.value) return 0
-  return activeCode.value.split('\n').length
-})
-
-async function copyCode() {
-  try {
-    await navigator.clipboard.writeText(activeCode.value)
+function copyCode() {
+  if (!currentFile.value) return
+  navigator.clipboard.writeText(currentFile.value.code).then(() => {
     copied.value = true
     setTimeout(() => { copied.value = false }, 2000)
-  } catch {
-    const textarea = document.createElement('textarea')
-    textarea.value = activeCode.value
-    document.body.appendChild(textarea)
-    textarea.select()
-    document.execCommand('copy')
-    document.body.removeChild(textarea)
-    copied.value = true
-    setTimeout(() => { copied.value = false }, 2000)
-  }
+  })
 }
 </script>
 
 <style scoped>
 .code-panel {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  height: 100%;
-  background: #1e1e1e;
+  background: #1e1e2e;
+  color: #cdd6f4;
 }
-.code-toolbar {
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 8px;
+  border-bottom: 1px solid #313244;
+  background: #181825;
+  min-height: 42px;
+}
+
+.tabs {
+  display: flex;
+  gap: 0;
+  overflow-x: auto;
+}
+
+.tab {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 16px;
-  background: #252526;
-  border-bottom: 1px solid #3e3e42;
+  gap: 4px;
+  padding: 8px 14px;
+  border: none;
+  background: transparent;
+  color: #6c7086;
+  cursor: pointer;
+  font-size: 13px;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.tab:hover {
+  color: #bac2de;
+  background: rgba(205, 214, 244, 0.05);
+}
+.tab.active {
+  color: #89b4fa;
+  border-bottom-color: #89b4fa;
+  background: rgba(137, 180, 250, 0.08);
+}
+
+.tab-icon { font-size: 12px; }
+.tab-name { font-size: 13px; }
+.tab-lang {
+  font-size: 11px;
+  color: #585b70;
+  margin-left: 2px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
   flex-shrink: 0;
 }
-.code-toolbar-left {
-  display: flex;
-  align-items: center;
-  gap: 16px;
+
+.file-count {
+  font-size: 11px;
+  color: #6c7086;
 }
-.code-title { font-size: 14px; font-weight: 600; color: #cccccc; }
-.code-subtabs { display: flex; gap: 4px; }
-.code-subtab {
-  padding: 4px 10px;
-  border: 1px solid #3e3e42;
-  background: #2d2d30;
-  color: #858585;
+
+.btn-copy {
+  padding: 4px 12px;
+  border: 1px solid #45475a;
   border-radius: 4px;
+  background: transparent;
+  color: #a6adc8;
   cursor: pointer;
   font-size: 12px;
-  transition: all 0.2s;
-  font-family: inherit;
+  transition: all 0.15s;
 }
-.code-subtab:hover { color: #ccc; }
-.code-subtab.active {
-  background: #37373d;
-  color: #fff;
-  border-color: #6366f1;
+.btn-copy:hover {
+  border-color: #89b4fa;
+  color: #89b4fa;
 }
-.code-actions { display: flex; align-items: center; gap: 10px; }
-.code-info { font-size: 12px; color: #858585; }
-.code-copy {
-  border: 1px solid #3e3e42; background: #2d2d30; color: #cccccc;
-  border-radius: 4px; cursor: pointer; padding: 4px 10px; font-size: 12px;
-  transition: all 0.2s;
+.btn-copy.copied {
+  border-color: #a6e3a1;
+  color: #a6e3a1;
 }
-.code-copy:hover { background: #3e3e42; color: #fff; }
-.code-content { flex: 1; overflow: auto; }
-.code-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; color: #666; gap: 12px;
+
+.code-content {
+  flex: 1;
+  overflow: auto;
+  padding: 16px;
 }
+
 .code-block {
-  margin: 0; padding: 16px;
-  font-family: 'Cascadia Code', 'Fira Code', 'Consolas', 'Monaco', monospace;
-  font-size: 13px; line-height: 1.6;
-  color: #d4d4d4;
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #cdd6f4;
+  white-space: pre;
+  tab-size: 2;
 }
-.code-block :deep(.hljs-tag) { color: #569cd6; }
-.code-block :deep(.hljs-name) { color: #4ec9b0; }
-.code-block :deep(.hljs-attr) { color: #9cdcfe; }
-.code-block :deep(.hljs-string) { color: #ce9178; }
-.code-block :deep(.hljs-keyword) { color: #c586c0; }
-.code-block :deep(.hljs-comment) { color: #6a9955; }
-.code-block :deep(.hljs-title) { color: #dcdcaa; }
-.code-block :deep(.hljs-built_in) { color: #4ec9b0; }
-.code-block :deep(.hljs-number) { color: #b5cea8; }
+
+.usage-tips {
+  border-top: 1px solid #313244;
+  padding: 12px 16px;
+  background: #181825;
+  font-size: 12px;
+  color: #a6adc8;
+  flex-shrink: 0;
+}
+.usage-tips h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: #f5c2e7;
+}
+.usage-tips ol {
+  margin: 0;
+  padding-left: 18px;
+  line-height: 1.8;
+}
+.usage-tips code {
+  background: #313244;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #f9e2af;
+}
 </style>
