@@ -74,14 +74,18 @@ const store = useWorkspaceStore()
 <style scoped>
 .workspace {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+  background: var(--cf-bg);
 }
 
 .workspace-left {
   width: 420px;
   flex-shrink: 0;
-  border-right: 1px solid #e2e8f0;
+  border-right: 1px solid var(--cf-border);
+  background: var(--cf-surface);
+  min-height: 0;
 }
 
 .workspace-right {
@@ -89,36 +93,41 @@ const store = useWorkspaceStore()
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-width: 0;
+  min-height: 0;
 }
 
 .workspace-tabs {
   display: flex;
   align-items: center;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  padding: 0 16px;
+  background: var(--cf-surface);
+  border-bottom: 1px solid var(--cf-border);
+  padding: 0 12px;
   flex-shrink: 0;
-  gap: 4px;
+  gap: 2px;
 }
 
 .tab-btn {
-  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 18px;
   border: none;
   background: none;
   cursor: pointer;
-  font-size: 14px;
-  font-weight: 500;
-  color: #64748b;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--cf-text-3);
   border-bottom: 2px solid transparent;
-  transition: all 0.2s;
+  transition: all 0.18s;
   font-family: inherit;
 }
 
-.tab-btn:hover { color: #334155; }
+.tab-btn:hover { color: var(--cf-text-2); }
 
 .tab-btn.active {
-  color: #6366f1;
-  border-bottom-color: #6366f1;
+  color: var(--cf-brand-strong);
+  border-bottom-color: var(--cf-brand);
 }
 
 .tab-info {
@@ -129,19 +138,21 @@ const store = useWorkspaceStore()
 }
 
 .tab-info-item {
-  color: #94a3b8;
-  background: #f1f5f9;
-  padding: 4px 10px;
-  border-radius: 50px;
+  color: var(--cf-text-3);
+  background: var(--cf-surface-3);
+  padding: 5px 12px;
+  border-radius: var(--cf-r-pill);
+  font-weight: 500;
 }
 
 .tab-info-item--comp {
-  background: #eef2ff;
-  color: #6366f1;
+  background: var(--cf-brand-soft);
+  color: var(--cf-brand-strong);
 }
 
 .workspace-tab-content {
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 </style>

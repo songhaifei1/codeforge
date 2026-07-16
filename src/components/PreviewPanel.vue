@@ -1,25 +1,40 @@
 <template>
   <div class="preview-panel">
-    <div class="preview-toolbar">
-      <span class="preview-title">页面预览</span>
-      <div class="preview-actions">
-        <span v-if="pageTypeName" class="preview-badge">{{ pageTypeName }}</span>
-        <span v-if="fileCount" class="preview-badge-files">{{ fileCount }} 文件</span>
-        <button class="preview-refresh" @click="renderPreview" title="刷新预览">↻</button>
+    <!-- 浏览器风格外框 -->
+    <div class="preview-browser">
+      <div class="browser-bar">
+        <div class="browser-dots">
+          <span></span><span></span><span></span>
+        </div>
+        <div class="browser-url">
+          <span class="browser-lock">🔒</span>
+          <span class="browser-url-text">{{ urlText }}</span>
+        </div>
+        <button class="browser-refresh" @click="renderPreview" title="刷新预览">↻</button>
+      </div>
+      <div class="preview-toolbar">
+        <span class="preview-title">页面预览</span>
+        <div class="preview-actions">
+          <span v-if="pageTypeName" class="preview-badge">{{ pageTypeName }}</span>
+          <span v-if="fileCount" class="preview-badge-files">{{ fileCount }} 文件</span>
+        </div>
       </div>
     </div>
+
     <div class="preview-content">
       <div v-if="!generatedResult" class="preview-empty">
         <div class="empty-icon">🎨</div>
         <p>输入需求后，生成的页面将在这里实时预览</p>
       </div>
-      <div v-else ref="previewRoot" class="preview-render-area"></div>
+      <div v-else class="preview-stage">
+        <div ref="previewRoot" class="preview-render-area"></div>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted, nextTick, createApp, defineComponent } from 'vue'
+import { ref, watch, onMounted, onUnmounted, nextTick, computed, createApp, defineComponent } from 'vue'
 import * as VueRuntime from 'vue'
 import { compile } from '@vue/compiler-dom'
 // ant-design-vue 预览组件
@@ -38,6 +53,11 @@ let app: ReturnType<typeof createApp> | null = null
 
 const pageTypeName = ref('')
 const fileCount = ref(0)
+
+const urlText = computed(() => {
+  const name = props.generatedResult?.entityName
+  return name ? `codeforge.app/p/${name}` : 'codeforge.app'
+})
 
 // @vue/compiler-dom 编译模板字符串为渲染函数
 function compileTemplate(template: string): (ctx: any, cache: any) => any {
@@ -129,37 +149,127 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: #f0f2f5;
+  background: var(--cf-surface-2);
+}
+
+/* 浏览器外框 */
+.preview-browser {
+  flex-shrink: 0;
+  background: var(--cf-surface);
+  border-bottom: 1px solid var(--cf-border);
+  box-shadow: var(--cf-shadow-sm);
+}
+.browser-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 16px;
+}
+.browser-dots {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+.browser-dots span {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+.browser-dots span:nth-child(1) { background: #ff5f57; }
+.browser-dots span:nth-child(2) { background: #febc2e; }
+.browser-dots span:nth-child(3) { background: #28c840; }
+.browser-url {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--cf-surface-2);
+  border: 1px solid var(--cf-border);
+  border-radius: var(--cf-r-pill);
+  padding: 6px 14px;
+  font-size: 12.5px;
+  color: var(--cf-text-3);
+  font-family: var(--cf-mono);
+  overflow: hidden;
+}
+.browser-lock { font-size: 11px; flex-shrink: 0; }
+.browser-url-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.browser-refresh {
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: 1px solid var(--cf-border);
+  background: var(--cf-surface);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--cf-text-3);
+  transition: all 0.18s;
+}
+.browser-refresh:hover {
+  color: var(--cf-brand);
+  border-color: var(--cf-brand);
 }
 .preview-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: #fff;
-  border-bottom: 1px solid #f0f0f0;
-  flex-shrink: 0;
+  padding: 8px 16px;
+  border-top: 1px solid var(--cf-border);
 }
-.preview-title { font-size: 14px; font-weight: 600; color: #333; }
+.preview-title { font-size: 13.5px; font-weight: 700; color: var(--cf-text); }
 .preview-actions { display: flex; align-items: center; gap: 8px; }
 .preview-badge {
-  font-size: 12px; padding: 2px 8px; border-radius: 4px;
-  background: #e6f4ff; color: #4096ff; font-weight: 600;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--cf-r-pill);
+  background: #e6f4ff;
+  color: #4096ff;
+  font-weight: 600;
 }
 .preview-badge-files {
-  font-size: 12px; padding: 2px 8px; border-radius: 4px;
-  background: #f0f5ff; color: #6366f1; font-weight: 600;
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: var(--cf-r-pill);
+  background: var(--cf-brand-soft);
+  color: var(--cf-brand-strong);
+  font-weight: 600;
 }
-.preview-refresh {
-  border: 1px solid #d9d9d9; background: #fff; border-radius: 4px;
-  cursor: pointer; padding: 2px 8px; font-size: 14px; color: #666;
+
+/* 画布区 */
+.preview-content {
+  flex: 1;
+  overflow: auto;
+  padding: 24px;
+  background-color: var(--cf-surface-2);
+  background-image: radial-gradient(circle at 1px 1px, var(--cf-border) 1px, transparent 0);
+  background-size: 22px 22px;
 }
-.preview-refresh:hover { color: #4096ff; border-color: #4096ff; }
-.preview-content { flex: 1; overflow: auto; }
 .preview-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  height: 100%; color: #999; gap: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--cf-text-3);
+  gap: 12px;
 }
-.empty-icon { font-size: 48px; opacity: 0.5; }
-.preview-render-area { min-height: 100%; }
+.empty-icon { font-size: 48px; opacity: 0.55; }
+.preview-stage {
+  min-height: 100%;
+  display: flex;
+}
+.preview-render-area {
+  flex: 1;
+  background: var(--cf-surface);
+  border-radius: var(--cf-r-lg);
+  box-shadow: var(--cf-shadow-lg);
+  border: 1px solid var(--cf-border);
+  overflow: hidden;
+  min-height: 420px;
+}
 </style>
